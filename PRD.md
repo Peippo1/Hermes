@@ -1,47 +1,69 @@
 # Product Requirements Document
 
-## Overview
+## Problem
 
-Hermes is a workflow prototype for sales enablement teams working across experience commerce and location-based entertainment.
+Commercial teams working in experience commerce and location-based entertainment often spend too much time turning account data into usable sales material. Source information arrives as exports, spreadsheets, or partial notes, and the preparation work for outreach and meetings is repetitive and inconsistent.
+
+## Users
+
+- Sales reps preparing outreach and follow-up
+- Commercial managers reviewing account opportunities
+- Sales operations teams standardising workflows
+- Stakeholders reviewing sample outputs and process quality
 
 ## Goals
 
-1. Load target account data from CSV or spreadsheet exports.
-2. Generate personalised outreach for selected accounts.
-3. Generate pre-meeting briefing notes for selected accounts.
-4. Add generated outreach to a mock outbound queue.
-5. Export generated outputs as CSV, JSON, and Markdown.
+- Load account data from CSV or XLSX files
+- Normalise source columns into a stable account schema
+- Generate deterministic outreach drafts from account records
+- Generate briefing notes for sales meetings
+- Queue outreach locally for review before any send step
+- Export example outputs for review and iteration
 
 ## Non-Goals
 
-- Real email delivery
-- Real social message delivery
-- Contact enrichment
-- CRM sync
-- Scheduling automation
+- Real sending
+- CRM synchronization
+- Authentication and role management
+- Automated enrichment
+- Scheduling or automation of follow-ups
+- Persistent storage
 
-## User Stories
+## Core Workflows
 
-- As a sales operator, I want to import accounts so I can work from a shared list.
-- As a sales operator, I want outreach drafts that reflect the source data without hallucinated claims.
-- As a sales operator, I want a briefing note before a meeting so I can prepare quickly.
-- As a reviewer, I want generated content to remain in a mock queue until approved.
-- As a stakeholder, I want exportable examples for review and iteration.
+1. Load accounts from a file in `data/`
+2. Review the account list through `GET /accounts`
+3. Open a single account with `GET /accounts/{account_id}`
+4. Generate outreach with `POST /generate/outreach`
+5. Generate a briefing with `POST /generate/briefing`
+6. Queue outreach through `POST /queue/outreach`
+7. Review the queue with `GET /queue`
+8. Export sample outputs with `POST /export/examples`
 
-## Requirements
+## Success Metrics
 
-- Accept CSV and spreadsheet exports.
-- Support account selection by account ID.
-- Use structured outputs for all generated content.
-- Preserve guardrails around tone, evidence, and source fidelity.
-- Keep queue operations in memory only.
-- Provide export artifacts for generated examples.
+- Account data loads successfully from valid CSV and XLSX files
+- Outreach drafts stay grounded in the source account data
+- Briefing notes include the required sales sections and directional estimates
+- Queue items remain local and reviewable
+- Export artifacts are generated reliably
+- The demo flow is understandable without additional explanation
 
-## Acceptance Criteria
+## Guardrails
 
-- The health endpoint reports the app is ready.
-- The accounts endpoint returns loaded records.
-- Outreach generation returns structured drafts.
-- Briefing generation returns structured notes.
-- Queueing stores items only in the mock queue.
-- Exporting writes CSV, JSON, and Markdown artifacts.
+- Do not invent named competitors or public claims
+- Do not invent metrics that are not derived from the account record
+- Keep outreach and briefing language company-neutral
+- Keep the queue as a mock review step only
+- Fail fast when the account file is missing or malformed
+- Label estimates as directional when exact values are not known
+
+## Future Improvements
+
+- Add persistent storage for accounts, queue items, and generated artifacts
+- Add authenticated access and role-based controls
+- Add audit logging and observability
+- Add approval workflows before any external send action
+- Add follow-up scheduling and retry logic
+- Add source enrichment and quality scoring
+- Add better document templating for team-specific use cases
