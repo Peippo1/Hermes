@@ -49,17 +49,22 @@ class RuntimeState:
         return None
 
     def _resolve_data_path(self) -> Path:
-        candidates = [config.data_path, Path(__file__).resolve().parent.parent / "data" / "sample_accounts.csv", Path(__file__).resolve().parent.parent / "outputs" / "sample_accounts.csv"]
+        base_dir = Path(__file__).resolve().parent.parent
+        sample_path = base_dir / "data" / "sample_accounts.csv"
+        fallback_candidates = [sample_path, base_dir / "outputs" / "sample_accounts.csv"]
+        candidates = [config.data_path] if config.data_path is not None else []
+        candidates.extend(fallback_candidates)
         for candidate in candidates:
-            if candidate.exists():
+            if candidate.is_file():
                 return candidate
-        return candidates[0]
+        candidate_text = ", ".join(str(candidate) for candidate in candidates if candidate is not None)
+        raise RuntimeError(f"No valid account data file found. Checked: {candidate_text}")
 
 
 try:
     app.state.runtime = RuntimeState()
-except AccountDataError as exc:
-    raise RuntimeError(f"Unable to load account data from {config.data_path}: {exc}") from exc
+except (AccountDataError, RuntimeError) as exc:
+    raise RuntimeError(f"Unable to load account data: {exc}") from exc
 
 
 @app.get("/health")

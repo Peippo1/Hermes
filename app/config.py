@@ -16,9 +16,16 @@ DEFAULT_DATA_PATH = BASE_DIR / "data" / "sample_accounts.csv"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _env_path(name: str) -> Path | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return None
+    return Path(raw_value.strip())
+
+
 @dataclass(frozen=True)
 class AppConfig:
-    data_path: Path = Path(os.getenv("HERMES_DATA_PATH", DEFAULT_DATA_PATH))
+    data_path: Path | None = _env_path("HERMES_DATA_PATH")
     generated_dir: Path = OUTPUT_DIR
     prompts_dir: Path = PROMPTS_DIR
     use_live_agents: bool = os.getenv("HERMES_USE_LIVE_AGENTS", "false").lower() in {"1", "true", "yes"}

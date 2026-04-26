@@ -43,6 +43,14 @@ class QueueAndExportTests(unittest.TestCase):
         self.assertEqual(queue_payload["queue_size"], len(queue_payload["items"]))
         self.assertEqual(queue_payload["items"][0]["status"], "pending_review")
 
+    def test_empty_data_path_falls_back_to_sample_file(self) -> None:
+        temp_config = replace(main_module.config, data_path=Path(""))
+        runtime = main_module.RuntimeState.__new__(main_module.RuntimeState)
+        with patch("app.main.config", temp_config):
+            runtime.__init__()
+        self.assertGreater(len(runtime.accounts), 0)
+        self.assertEqual(runtime.accounts[0].account_id, "ACCT-001")
+
     def test_queue_outreach_does_not_send_externally(self) -> None:
         draft = OutreachDraft(
             account_id="ACCT-002",
