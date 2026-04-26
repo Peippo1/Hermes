@@ -3,7 +3,14 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Environment files
 .env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # Mac
 .DS_Store
