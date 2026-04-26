@@ -63,7 +63,7 @@ npm run dev
 If the backend is running on another origin, set:
 
 ```bash
-cp .env.example .env
+cp frontend/.env.example frontend/.env
 ```
 
 Then update `VITE_API_BASE_URL` in `frontend/.env` to the backend base URL, for example:
@@ -73,6 +73,11 @@ VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 If `VITE_API_BASE_URL` is missing, the UI switches to demo mock mode and uses local sample data.
+When the backend is deployed, point `VITE_API_BASE_URL` at the Render URL, for example:
+
+```bash
+VITE_API_BASE_URL=https://hermes-backend.onrender.com
+```
 
 ## Render Deploy
 
@@ -98,6 +103,8 @@ OPENAI_API_KEY=your_key_here
 HERMES_MODEL=gpt-4.1-mini
 ```
 
+Example backend URL placeholder: `https://hermes-backend.onrender.com`
+
 The backend starts with the bundled sample data by default, so no extra database setup is required for the first deployment.
 
 ## Vercel Deploy
@@ -106,11 +113,13 @@ To deploy the frontend to Vercel:
 
 1. Import the repository into Vercel.
 2. Set the project root to `frontend`.
-3. Add `VITE_API_BASE_URL` as an environment variable if you want the deployed UI to call a backend API.
+3. Add `VITE_API_BASE_URL` as an environment variable and point it at the Render backend URL, for example `https://hermes-backend.onrender.com`.
 4. Use the default Vite build command, `npm run build`.
 5. Use the default output directory, `dist`.
 
 If you deploy the frontend without a backend URL, it still runs in mock mode for demos.
+
+Example frontend URL placeholder: `https://hermes-frontend.vercel.app`
 
 ## Demo Walkthrough
 
