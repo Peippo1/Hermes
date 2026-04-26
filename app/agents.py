@@ -135,31 +135,58 @@ def _channel_suffix(channel: str) -> str:
     }[channel]
 
 
+def _opening_sentence(account: AccountRecord, tone: str) -> str:
+    signal = (account.signal or "").lower()
+    if "opening" in signal or "open" in signal:
+        return {
+            "concise": f"{account.company_name} is opening a new venue soon.",
+            "warm": f"{account.company_name} is opening a new venue soon, and the launch window looks worth a closer look.",
+            "direct": f"{account.company_name} is opening a new venue soon, so now is the right time to focus on launch demand.",
+        }[tone]
+    if "retention" in signal:
+        return {
+            "concise": f"{account.company_name} is already running a retention campaign.",
+            "warm": f"{account.company_name} is already running a retention campaign, which makes repeat visits and off-peak demand the right focus.",
+            "direct": f"{account.company_name} is already running a retention campaign, so repeat visits and off-peak demand look like the right commercial angle.",
+        }[tone]
+    if "corporate events" in signal:
+        return {
+            "concise": f"{account.company_name} has recently expanded its corporate events team.",
+            "warm": f"{account.company_name} has recently expanded its corporate events team, which puts weekday group bookings in focus.",
+            "direct": f"{account.company_name} has recently expanded its corporate events team, so weekday group bookings look like the immediate commercial angle.",
+        }[tone]
+    if "group bookings" in signal:
+        return {
+            "concise": f"{account.company_name} is seeing stronger interest in group bookings.",
+            "warm": f"{account.company_name} is seeing stronger interest in group bookings, which makes weekday demand worth a closer look.",
+            "direct": f"{account.company_name} is seeing stronger interest in group bookings, so weekday demand looks like the immediate angle.",
+        }[tone]
+    if account.signal:
+        return {
+            "concise": f"{account.company_name} has a clear current signal: {account.signal}.",
+            "warm": f"{account.company_name} has a clear current signal in play: {account.signal}.",
+            "direct": f"{account.company_name} has a clear current signal: {account.signal}.",
+        }[tone]
+    return {
+        "concise": f"{account.company_name} is moving through a practical growth phase.",
+        "warm": f"{account.company_name} is moving through a practical growth phase, which makes a short, relevant first touch sensible.",
+        "direct": f"{account.company_name} is moving through a practical growth phase, so a short commercial first touch makes sense.",
+    }[tone]
+
+
 def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
     greeting = account.contact_name.split()[0] if account.contact_name else "there"
-    opening = _tone_opening(tone)
-    focus = _message_focus(account)
-    if account.signal and "opening" in account.signal.lower():
-        signal_line = f"Northstar is opening a new venue soon." if account.company_name == "Northstar Leisure Group" else f"{account.company_name} is opening a new venue soon."
-    elif account.signal:
-        signal_line = f"{account.company_name} has a clear signal: {account.signal}."
-    else:
-        signal_line = f"{account.company_name} is moving through a practical growth phase."
-
-    if account.number_of_sites == 1:
-        site_line = "For a single-site business, "
-    elif account.number_of_sites:
+    opening = _opening_sentence(account, tone)
+    focus = account.objective or _message_focus(account)
+    if account.number_of_sites:
         site_line = f"For {_site_phrase(account)}, "
     else:
         site_line = "For teams like yours, "
-    focus_phrase = "pre-opening bookings and memberships" if account.objective else focus
-    outcome_phrase = "pre-opening bookings and memberships" if account.objective else "a practical commercial next step"
-    signal_clause = f"{signal_line} " if account.signal else ""
     message = (
-        f"Hi {greeting}, {opening} {signal_clause}"
-        f"{site_line}{focus_phrase} need a clean follow-through. "
-        f"A lighter workflow can help your team turn these signals into sharper outreach and follow-up without much manual work. "
-        f"Worth a quick look at whether that could support {outcome_phrase}?"
+        f"Hi {greeting}, {opening} "
+        f"{site_line}{focus} should stay the commercial focus. "
+        f"A cleaner workflow can help the team keep outreach and follow-up aligned without extra admin. "
+        f"Worth a quick look at how to help {focus}?"
     )
     words = message.split()
     if len(words) > 100:
