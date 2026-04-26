@@ -1,6 +1,8 @@
 # Hermes
 
-Hermes is a FastAPI prototype for sales enablement in experience commerce and location-based entertainment.
+AI workflow prototype for sales enablement in the experience commerce sector.
+
+Generates personalised outreach, pre-meeting briefings, and mock outbound sequencing from a target account list.
 
 It supports:
 
