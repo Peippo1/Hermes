@@ -1,75 +1,71 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterable
-from uuid import uuid4
 
-from .agents import _run_live_agent, build_briefing_note, build_outreach_message
-from .models import AccountRecord, BriefingNote, BriefingRequest, OutreachMessage, OutreachRequest, QueueItem, QueueOutreachRequest
+from .agents import _run_live_agent, build_briefing_markdown, build_outreach_draft
+from .models import AccountRecord, BriefingNote, BriefingRequest, OutreachDraft, OutreachRequest, QueueItem, QueueOutreachRequest
 from .send_queue import SendQueue
 
 
-def _select_accounts(accounts: Iterable[AccountRecord], account_ids: list[str]) -> list[AccountRecord]:
-    account_map = {account.account_id: account for account in accounts}
-    if not account_ids:
-        return list(account_map.values())
-    return [account_map[account_id] for account_id in account_ids if account_id in account_map]
+def _select_account(accounts: Iterable[AccountRecord], account_id: str) -> AccountRecord:
+    for account in accounts:
+        if account.account_id == account_id:
+            return account
+    raise ValueError(f"Account not found: {account_id}")
+
+
+def _outreach_from_live_agent(account: AccountRecord, request: OutreachRequest) -> OutreachDraft | None:
+    live_prompt = (
+        "Write a structured cold outreach draft using only the provided account data. "
+        "Do not invent facts or named contacts. Keep it concise and non-salesy. "
+        f"Account JSON: {account.model_dump()}. "
+        f"Request: {request.model_dump()}."
+    )
+    return _run_live_agent(
+        OutreachDraft,
+        "You generate structured cold outreach with strict source fidelity, no fabrication, and no real sending.",
+        live_prompt,
+    )
+
+
+def _briefing_from_live_agent(account: AccountRecord) -> BriefingNote | None:
+    live_prompt = (
+        "Write a markdown briefing note using only the provided account data. "
+        "Do not invent facts. Keep the note practical and readable. "
+        f"Account JSON: {account.model_dump()}."
+    )
+    return _run_live_agent(
+        BriefingNote,
+        "You generate concise markdown briefing notes with strict source fidelity and no unsupported claims.",
+        live_prompt,
+    )
 
 
 def generate_outreach(
     accounts: Iterable[AccountRecord],
     request: OutreachRequest,
     use_live_agents: bool = False,
-) -> list[OutreachMessage]:
-    selected = _select_accounts(accounts, request.account_ids)
-    results: list[OutreachMessage] = []
-    for account in selected:
-        live_result = None
-        if use_live_agents:
-            live_prompt = (
-                "Write a personalized outreach draft using only the provided account data. "
-                "Do not invent facts. Keep the tone clear, warm, and concise. "
-                f"Target account JSON: {account.model_dump()}. "
-                f"Request: {request.model_dump()}."
-            )
-            live_result = _run_live_agent(
-                OutreachMessage,
-                "You generate structured outreach drafts with strict source fidelity and no real sending.",
-                live_prompt,
-            )
-        if isinstance(live_result, OutreachMessage):
-            results.append(live_result)
-            continue
-        results.append(build_outreach_message(account, request.tone, request.goal, request.channel))
-    return results
+) -> OutreachDraft:
+    account = _select_account(accounts, request.account_id)
+    if use_live_agents:
+        live_result = _outreach_from_live_agent(account, request)
+        if isinstance(live_result, OutreachDraft):
+            return live_result
+    return build_outreach_draft(account, request.channel, request.tone, request.goal)
 
 
-def generate_briefings(
+def generate_briefing(
     accounts: Iterable[AccountRecord],
     request: BriefingRequest,
     use_live_agents: bool = False,
-) -> list[BriefingNote]:
-    selected = _select_accounts(accounts, request.account_ids)
-    results: list[BriefingNote] = []
-    for account in selected:
-        live_result = None
-        if use_live_agents:
-            live_prompt = (
-                "Write a pre-meeting briefing note using only the provided account data. "
-                "Do not invent facts. Keep the note practical and concise. "
-                f"Target account JSON: {account.model_dump()}. "
-                f"Request: {request.model_dump()}."
-            )
-            live_result = _run_live_agent(
-                BriefingNote,
-                "You generate structured briefing notes with strict source fidelity and no unsupported claims.",
-                live_prompt,
-            )
+) -> BriefingNote:
+    account = _select_account(accounts, request.account_id)
+    if use_live_agents:
+        live_result = _briefing_from_live_agent(account)
         if isinstance(live_result, BriefingNote):
-            results.append(live_result)
-            continue
-        results.append(build_briefing_note(account))
-    return results
+            return live_result
+    return build_briefing_markdown(account)
 
 
 def queue_outreach(
@@ -77,23 +73,20 @@ def queue_outreach(
     request: QueueOutreachRequest,
     queue: SendQueue,
     use_live_agents: bool = False,
-) -> list[QueueItem]:
-    generated = generate_outreach(accounts, request, use_live_agents=use_live_agents)
-    queued_items: list[QueueItem] = []
+) -> QueueItem:
+    draft = generate_outreach(accounts, OutreachRequest(account_id=request.account_id, channel=request.channel, tone=request.tone, goal=request.goal), use_live_agents=use_live_agents)
     created_at = datetime.now(timezone.utc)
-    for message in generated:
-        queued_items.append(
-            queue.enqueue(
-                QueueItem(
-                    queue_id=str(uuid4()),
-                    created_at=created_at,
-                    schedule_for=request.schedule_for,
-                    account_id=message.account_id,
-                    account_name=message.account_name,
-                    channel=message.channel,
-                    subject=message.subject,
-                    body=message.body,
-                )
-            )
-        )
-    return queued_items
+    item = QueueItem(
+        account={
+            "account_id": draft.account_id,
+            "company_name": draft.company_name,
+        },
+        persona=draft.persona,
+        channel=draft.channel,
+        message=draft.message,
+        created_at=created_at,
+        follow_up_day_3=(created_at + timedelta(days=3)).isoformat(),
+        follow_up_day_7=(created_at + timedelta(days=7)).isoformat(),
+    )
+    return queue.enqueue(item)
+

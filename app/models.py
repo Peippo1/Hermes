@@ -10,15 +10,20 @@ class AccountRecord(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     account_id: str = Field(description="Unique account identifier")
-    account_name: str = Field(description="Display name for the account")
-    segment: str | None = None
-    venue_type: str | None = None
-    city: str | None = None
+    company_name: str = Field(description="Normalised company name")
+    category: str | None = None
+    sub_category: str | None = None
+    description: str | None = None
+    hq_location: str | None = None
+    number_of_sites: int | None = None
+    estimated_annual_visits: int | None = None
+    estimated_average_ticket_price: float | None = None
+    estimated_transaction_volume: int | None = None
+    estimated_annual_revenue: float | None = None
     region: str | None = None
-    country: str | None = None
-    website: str | None = None
     contact_name: str | None = None
     contact_role: str | None = None
+    website: str | None = None
     signal: str | None = None
     objective: str | None = None
     notes: str | None = None
@@ -26,77 +31,67 @@ class AccountRecord(BaseModel):
 
 
 class OutreachRequest(BaseModel):
-    account_ids: list[str] = Field(default_factory=list)
+    account_id: str
+    channel: Literal["email", "linkedin"] = "email"
     tone: str = "clear, warm, concise"
     goal: str = "book a discovery conversation"
-    channel: Literal["email", "linkedin"] = "email"
-    include_subject: bool = True
 
 
 class BriefingRequest(BaseModel):
-    account_ids: list[str] = Field(default_factory=list)
-    focus: str = "pre-meeting briefing"
-
-
-class QueueOutreachRequest(OutreachRequest):
-    schedule_for: datetime | None = None
-
-
-class PersonalizationPoint(BaseModel):
-    label: str
-    detail: str
-
-
-class OutreachMessage(BaseModel):
     account_id: str
-    account_name: str
+
+
+class QueueOutreachRequest(BaseModel):
+    account_id: str
+    channel: Literal["email", "linkedin"] = "email"
+    tone: str = "clear, warm, concise"
+    goal: str = "book a discovery conversation"
+
+
+class OutreachDraft(BaseModel):
+    account_id: str
+    company_name: str
+    persona: str
+    role_reasoning: str
+    selected_value_props: list[str] = Field(default_factory=list)
+    business_insight: str
+    estimated_impact: str
+    message: str
+    risk_flags: list[str] = Field(default_factory=list)
     channel: str = "email"
-    tone: str
-    subject: str
-    preview: str
-    body: str
-    call_to_action: str
-    personalization_points: list[PersonalizationPoint] = Field(default_factory=list)
-    guardrails: list[str] = Field(default_factory=list)
-    source_data: dict[str, Any] = Field(default_factory=dict)
+    tone: str = "clear, warm, concise"
 
 
 class BriefingNote(BaseModel):
     account_id: str
-    account_name: str
-    summary: str
-    account_snapshot: list[str] = Field(default_factory=list)
-    opportunities: list[str] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
-    questions: list[str] = Field(default_factory=list)
-    suggested_next_step: str
-    guardrails: list[str] = Field(default_factory=list)
+    company_name: str
+    markdown: str
     source_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class QueueItem(BaseModel):
-    queue_id: str
+    account: dict[str, Any]
+    persona: str
+    channel: str
+    message: str
+    status: str = "pending_review"
     created_at: datetime
-    schedule_for: datetime | None = None
-    account_id: str
-    account_name: str
-    channel: str = "email"
-    subject: str
-    body: str
-    status: str = "queued"
-    source: str = "mock_send_queue"
-
-
-class ExportArtifacts(BaseModel):
-    csv_path: str
-    json_path: str
-    markdown_path: str
-    generated_count: int
+    follow_up_day_3: str
+    follow_up_day_7: str
 
 
 class AccountsResponse(BaseModel):
     accounts: list[AccountRecord]
 
 
-class GenerationResponse(BaseModel):
-    items: list[OutreachMessage | BriefingNote]
+class QueueResponse(BaseModel):
+    items: list[QueueItem]
+
+
+class ExportArtifacts(BaseModel):
+    outreach_csv_path: str
+    outreach_json_path: str
+    briefing_note_1_path: str
+    briefing_note_2_path: str
+    send_queue_path: str
+

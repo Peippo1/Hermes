@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 
 from .agents import agent_mode
 from .config import get_config
-from .data_loader import load_accounts_from_path
-from .exporters import export_json, export_markdown_briefings, export_markdown_outreach, export_outreach_csv
-from .models import AccountsResponse, BriefingRequest, GenerationResponse, OutreachRequest, QueueOutreachRequest
+from .data_loader import AccountDataError, load_accounts_from_path
+from .exporters import export_briefing_markdown, export_outreach_csv, export_outreach_json, export_queue_json
+from .models import AccountRecord, AccountsResponse, BriefingNote, BriefingRequest, OutreachDraft, OutreachRequest, QueueOutreachRequest, QueueResponse
 from .send_queue import SendQueue
-from .workflows import generate_briefings, generate_outreach, queue_outreach
+from .workflows import generate_briefing, generate_outreach, queue_outreach
 
 
 config = get_config()
-app = FastAPI(title=config.app_name, version="0.1.0")
+app = FastAPI(title=config.app_name, version="0.2.0")
 
 
 class RuntimeState:
@@ -23,8 +22,17 @@ class RuntimeState:
         self.accounts = load_accounts_from_path(config.data_path)
         self.queue = SendQueue()
 
+    def get_account(self, account_id: str) -> AccountRecord | None:
+        for account in self.accounts:
+            if account.account_id == account_id:
+                return account
+        return None
 
-app.state.runtime = RuntimeState()
+
+try:
+    app.state.runtime = RuntimeState()
+except AccountDataError as exc:
+    raise RuntimeError(f"Unable to load account data from {config.data_path}: {exc}") from exc
 
 
 @app.get("/health")
@@ -37,7 +45,6 @@ def health() -> dict[str, object]:
         "queue_items": len(app.state.runtime.queue.items),
         "live_agents_enabled": mode.live,
         "agent_key_present": mode.enabled,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -46,58 +53,78 @@ def get_accounts() -> AccountsResponse:
     return AccountsResponse(accounts=app.state.runtime.accounts)
 
 
-@app.post("/generate/outreach", response_model=GenerationResponse)
-def generate_outreach_endpoint(request: OutreachRequest) -> GenerationResponse:
-    items = generate_outreach(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
-    return GenerationResponse(items=items)
+@app.get("/accounts/{account_id}", response_model=AccountRecord)
+def get_account(account_id: str) -> AccountRecord:
+    account = app.state.runtime.get_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Account '{account_id}' was not found.")
+    return account
 
 
-@app.post("/generate/briefing", response_model=GenerationResponse)
-def generate_briefing_endpoint(request: BriefingRequest) -> GenerationResponse:
-    items = generate_briefings(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
-    return GenerationResponse(items=items)
+@app.post("/generate/outreach", response_model=OutreachDraft)
+def generate_outreach_endpoint(request: OutreachRequest) -> OutreachDraft:
+    return generate_outreach(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
+
+
+@app.post("/generate/briefing", response_model=BriefingNote)
+def generate_briefing_endpoint(request: BriefingRequest) -> BriefingNote:
+    return generate_briefing(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
 
 
 @app.post("/queue/outreach")
 def queue_outreach_endpoint(request: QueueOutreachRequest) -> dict[str, object]:
-    items = queue_outreach(app.state.runtime.accounts, request, app.state.runtime.queue, use_live_agents=config.use_live_agents)
-    return {"queued": items, "queue_size": len(app.state.runtime.queue.items)}
+    queued = queue_outreach(app.state.runtime.accounts, request, app.state.runtime.queue, use_live_agents=config.use_live_agents)
+    return {"item": queued.model_dump(mode="json"), "queue_size": len(app.state.runtime.queue.items)}
 
 
-@app.get("/queue")
-def list_queue() -> dict[str, object]:
-    return {"items": app.state.runtime.queue.list_items()}
+@app.get("/queue", response_model=QueueResponse)
+def list_queue() -> QueueResponse:
+    return QueueResponse(items=app.state.runtime.queue.list_items())
 
 
 @app.post("/export/examples")
 def export_examples() -> dict[str, object]:
-    selected_accounts = app.state.runtime.accounts[:5]
-    outreach = generate_outreach(
-        selected_accounts,
-        OutreachRequest(account_ids=[account.account_id for account in selected_accounts]),
-        use_live_agents=False,
-    )
-    briefings = generate_briefings(
-        selected_accounts,
-        BriefingRequest(account_ids=[account.account_id for account in selected_accounts]),
-        use_live_agents=False,
-    )
+    selected_accounts = app.state.runtime.accounts[:2]
+    outreach_items = [
+        generate_outreach(
+            app.state.runtime.accounts,
+            OutreachRequest(account_id=account.account_id),
+            use_live_agents=False,
+        )
+        for account in selected_accounts
+    ]
+    briefing_items = [
+        generate_briefing(
+            app.state.runtime.accounts,
+            BriefingRequest(account_id=account.account_id),
+            use_live_agents=False,
+        )
+        for account in selected_accounts
+    ]
     generated_dir = Path(config.generated_dir)
-    csv_path = export_outreach_csv(outreach, generated_dir / "outreach_examples.csv")
-    json_path = export_json(
-        {"outreach": [item.model_dump() for item in outreach], "briefings": [item.model_dump() for item in briefings]},
-        generated_dir / "example_bundle.json",
-    )
-    outreach_md_path = export_markdown_outreach(outreach, generated_dir / "outreach_examples.md")
-    briefing_md_path = export_markdown_briefings(briefings, generated_dir / "briefing_examples.md")
+    outreach_csv_path = export_outreach_csv(outreach_items, generated_dir / "outreach_examples.csv")
+    outreach_json_path = export_outreach_json(outreach_items, generated_dir / "outreach_examples.json")
+    briefing_note_1_path = export_briefing_markdown(briefing_items[0], generated_dir / "briefing_note_1.md")
+    briefing_note_2_path = export_briefing_markdown(briefing_items[1], generated_dir / "briefing_note_2.md")
+    sample_queue = SendQueue()
+    send_queue_items = [
+        queue_outreach(
+            app.state.runtime.accounts,
+            QueueOutreachRequest(account_id=account.account_id),
+            sample_queue,
+            use_live_agents=False,
+        )
+        for account in selected_accounts
+    ]
+    send_queue_path = export_queue_json(send_queue_items, generated_dir / "send_queue.json")
     return {
-        "outreach": [item.model_dump() for item in outreach],
-        "briefings": [item.model_dump() for item in briefings],
+        "outreach": [item.model_dump() for item in outreach_items],
+        "briefings": [item.model_dump() for item in briefing_items],
         "artifacts": {
-            "csv_path": str(csv_path),
-            "json_path": str(json_path),
-            "outreach_markdown_path": str(outreach_md_path),
-            "briefing_markdown_path": str(briefing_md_path),
-            "generated_count": len(outreach) + len(briefings),
+            "outreach_csv_path": str(outreach_csv_path),
+            "outreach_json_path": str(outreach_json_path),
+            "briefing_note_1_path": str(briefing_note_1_path),
+            "briefing_note_2_path": str(briefing_note_2_path),
+            "send_queue_path": str(send_queue_path),
         },
     }

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
-from .models import AccountRecord, BriefingNote, OutreachMessage, PersonalizationPoint
+from .models import AccountRecord, BriefingNote, OutreachDraft
 
 
 @dataclass(frozen=True)
@@ -27,111 +27,167 @@ def _pick(sequence: list[str], seed: int) -> str:
     return sequence[seed % len(sequence)]
 
 
-def build_outreach_message(account: AccountRecord, tone: str, goal: str, channel: str) -> OutreachMessage:
-    seed = _seed(account, "outreach")
-    opener_templates = [
-        "I noticed that the record mentions {detail}, and that looks relevant to {goal}.",
-        "The source data suggests {detail}, which makes a short conversation about {goal} worth considering.",
-        "Based on the available account data, {detail} stands out as a useful signal for {goal}.",
+def _persona_for_account(account: AccountRecord) -> str:
+    if account.contact_role:
+        return account.contact_role
+    if account.category:
+        return f"{account.category} leader"
+    return "commercial lead"
+
+
+def _role_reasoning(account: AccountRecord) -> str:
+    parts = [account.category, account.sub_category, account.objective]
+    pieces = [part for part in parts if part]
+    if pieces:
+        return f"The available record points to {'; '.join(pieces)}."
+    return "The record has enough commercial context to justify a practical first-touch message."
+
+
+def _value_props(account: AccountRecord) -> list[str]:
+    props = [
+        account.signal or "current commercial activity in the account",
+        account.objective or "a clearer path to commercial conversion",
+        account.description or "the account's operating model and footprint",
     ]
-    subject_templates = [
-        "Idea for {account_name}",
-        "A practical note for {account_name}",
-        "Thoughts on {account_name} growth",
-        "A quick idea for {city}",
+    return [prop for prop in props if prop]
+
+
+def _business_insight(account: AccountRecord) -> str:
+    location = account.hq_location or account.region or "the account's market"
+    if account.estimated_annual_revenue and account.number_of_sites:
+        return (
+            f"With {account.number_of_sites} sites and an estimated annual revenue of "
+            f"{account.estimated_annual_revenue:,.0f}, {account.company_name} appears positioned to benefit from sharper conversion, "
+            f"repeat visit, or group booking improvements in {location}."
+        )
+    return f"The account appears to have a meaningful commercial opportunity in {location}, based on the available record."
+
+
+def _estimated_impact(account: AccountRecord) -> str:
+    visits = account.estimated_annual_visits
+    revenue = account.estimated_annual_revenue
+    ticket = account.estimated_average_ticket_price
+    if visits and revenue and ticket:
+        uplift_visits = max(1, round(visits * 0.05))
+        uplift_revenue = max(1, round(revenue * 0.05))
+        return (
+            f"A modest 5% uplift could mean roughly {uplift_visits:,} additional annual visits "
+            f"or about {uplift_revenue:,.0f} in annual revenue, depending on the commercial lever."
+        )
+    if revenue:
+        uplift_revenue = max(1, round(revenue * 0.05))
+        return f"A modest 5% uplift could mean about {uplift_revenue:,.0f} in annual revenue."
+    return "A small uplift in conversion or repeat visits would likely justify a follow-up commercial conversation."
+
+
+def _risk_flags(account: AccountRecord, message: str) -> list[str]:
+    flags: list[str] = [
+        "Do not present unsupported claims as facts.",
+        "Keep the tone credible and non-salesy.",
+        "No real sending is performed from this prototype.",
     ]
-    ctas = [
-        "Would it be useful to compare notes on this next week?",
-        "Open to a short conversation about the idea?",
-        "If this is relevant, I can share a tighter version tailored to your team.",
-    ]
-    detail = account.signal or account.objective or account.venue_type or "your current priorities"
-    city = account.city or "your market"
-    subject = _pick(subject_templates, seed).format(account_name=account.account_name, city=city)
-    opener = _pick(opener_templates, seed).format(detail=detail, goal=goal)
-    cta = _pick(ctas, seed)
-    body = (
-        f"Hi {account.contact_name or 'there'},\n\n"
-        f"{opener} "
-        f"For an account like {account.account_name}, I would keep the note focused on {goal} and anchor it in the source data we actually have. "
-        f"That keeps the draft useful without stretching beyond the record.\n\n"
-        f"{cta}\n\n"
+    if not account.contact_name:
+        flags.append("No named contact provided; keep the greeting generic.")
+    if len(message.split()) > 170:
+        flags.append("Outreach is longer than a concise cold message should be.")
+    if not account.signal and not account.objective and not account.description:
+        flags.append("Source data is thin; avoid unsupported claims.")
+    if account.contact_name:
+        flags.append("Named contact can be used only because it was present in the source file.")
+    return flags
+
+
+def build_outreach_draft(account: AccountRecord, channel: str, tone: str, goal: str) -> OutreachDraft:
+    persona = _persona_for_account(account)
+    role_reasoning = _role_reasoning(account)
+    selected_value_props = _value_props(account)
+    business_insight = _business_insight(account)
+    estimated_impact = _estimated_impact(account)
+    opener = account.contact_name if account.contact_name else "there"
+    message = (
+        f"Hi {opener},\n\n"
+        f"{business_insight} "
+        f"I thought it would be useful to share one idea that could support {goal} without adding unnecessary noise. "
+        f"Specifically, the record suggests {selected_value_props[0] if selected_value_props else 'a clear commercial opportunity'}.\n\n"
+        f"If it is relevant, I can share a short version tailored to the current priorities.\n\n"
         f"Best,\nHermes"
     )
-    personalization_points = [
-        PersonalizationPoint(label="Signal", detail=account.signal or "No direct signal provided in the source file."),
-        PersonalizationPoint(label="Objective", detail=account.objective or "No objective captured in the source file."),
-        PersonalizationPoint(label="Location", detail=", ".join([part for part in [account.city, account.region] if part]) or "Location not provided."),
-    ]
-    guardrails = [
-        "Do not invent revenue figures, partners, or campaign results.",
-        "Keep the tone practical, concise, and respectful.",
-        "Flag missing source fields instead of guessing.",
-        "This workflow only prepares a draft for a mock queue; it never sends a real message.",
-    ]
-    return OutreachMessage(
+    return OutreachDraft(
         account_id=account.account_id,
-        account_name=account.account_name,
+        company_name=account.company_name,
+        persona=persona,
+        role_reasoning=role_reasoning,
+        selected_value_props=selected_value_props,
+        business_insight=business_insight,
+        estimated_impact=estimated_impact,
+        message=message,
+        risk_flags=_risk_flags(account, message),
         channel=channel,
         tone=tone,
-        subject=subject,
-        preview=body[:220].replace("\n", " "),
-        body=body,
-        call_to_action=cta,
-        personalization_points=personalization_points,
-        guardrails=guardrails,
-        source_data=account.model_dump(),
     )
 
 
-def build_briefing_note(account: AccountRecord) -> BriefingNote:
-    summary = (
-        f"{account.account_name} is a {account.segment or 'unspecified'} account in "
-        f"{account.city or 'an unspecified market'} with a near-term commercial opportunity."
+def build_briefing_markdown(account: AccountRecord) -> BriefingNote:
+    company_overview = (
+        f"{account.company_name} is a {account.category or 'commercial'} account "
+        f"with headquarters in {account.hq_location or 'an unspecified location'} and a regional footprint of "
+        f"{account.number_of_sites if account.number_of_sites is not None else 'unknown'} sites."
     )
-    opportunities = [
-        f"Use {account.signal or 'the current account signal'} as the opening context.",
-        f"Position the conversation around {account.objective or 'a measurable commercial outcome'}.",
-        "Keep the first meeting focused on practical next steps and decision criteria.",
-    ]
-    risks = [
-        "Do not overstate familiarity with the account.",
-        "Avoid claims about site performance, audience size, or pipeline unless present in the file.",
-        "Keep the briefing grounded in observed source fields only.",
-    ]
-    questions = [
-        "What is the current commercial priority for the next 90 days?",
-        "Which audience or visit segment matters most right now?",
-        "What would make a follow-up conversation worthwhile?",
-    ]
-    guardrails = [
-        "Use tentative language when source data is thin.",
-        "Call out gaps explicitly rather than filling them in.",
-        "No real outreach execution is performed from this note.",
-    ]
-    snapshot = [
-        f"Segment: {account.segment or 'not supplied'}",
-        f"Venue type: {account.venue_type or 'not supplied'}",
-        f"Location: {', '.join([part for part in [account.city, account.region, account.country] if part]) or 'not supplied'}",
-        f"Signal: {account.signal or 'not supplied'}",
-        f"Objective: {account.objective or 'not supplied'}",
-    ]
-    return BriefingNote(
-        account_id=account.account_id,
-        account_name=account.account_name,
-        summary=summary,
-        account_snapshot=snapshot,
-        opportunities=opportunities,
-        risks=risks,
-        questions=questions,
-        suggested_next_step="Prepare a short conversation plan that reflects the account's stated goal and avoids unsupported claims.",
-        guardrails=guardrails,
-        source_data=account.model_dump(),
+    persona_profile = (
+        f"Primary persona: {account.contact_role or 'commercial lead'}\n\n"
+        f"Reasoning: {account.contact_name or 'no named contact was supplied'}, so the brief should be written for the role rather than an assumed person."
     )
-
-
-def try_live_generation(*_: Any, **__: Any) -> Any:
-    return None
+    value_case = (
+        f"The strongest value case is around {account.objective or 'commercial conversion'}, using "
+        f"{account.signal or 'the current account signal'} as the opening hook."
+    )
+    quantified_impact = _estimated_impact(account)
+    talking_points = [
+        "Lead with the commercial problem rather than a product pitch.",
+        "Tie the conversation to current footprint, visit volume, or conversion efficiency where available.",
+        "Keep the first meeting focused on practical next steps and proof criteria.",
+    ]
+    likely_objections = [
+        "The timing is not right.",
+        "We already have a process for this.",
+        "We need evidence before changing anything.",
+    ]
+    competitive_context = (
+        "The brief should assume the team may compare existing tools, internal processes, and alternative platforms; "
+        "avoid overstating differentiation without evidence."
+    )
+    recommended_next_step = "Open with one relevant signal, confirm the current priority, and ask for the smallest useful next meeting step."
+    markdown = "\n".join(
+        [
+            "# Briefing note",
+            "",
+            "## Company overview",
+            company_overview,
+            "",
+            "## Individual/persona profile",
+            persona_profile,
+            "",
+            "## Value case",
+            value_case,
+            "",
+            "## Quantified impact",
+            quantified_impact,
+            "",
+            "## Talking points",
+            *[f"- {point}" for point in talking_points],
+            "",
+            "## Likely objections",
+            *[f"- {point}" for point in likely_objections],
+            "",
+            "## Competitive context",
+            competitive_context,
+            "",
+            "## Recommended next step",
+            recommended_next_step,
+            "",
+        ]
+    )
+    return BriefingNote(account_id=account.account_id, company_name=account.company_name, markdown=markdown, source_data=account.model_dump())
 
 
 def _run_live_agent(output_type: type[Any], instructions: str, input_text: str) -> Any | None:
@@ -141,11 +197,7 @@ def _run_live_agent(output_type: type[Any], instructions: str, input_text: str) 
         return None
 
     async def _runner() -> Any:
-        agent = Agent(
-            name="Hermes drafting agent",
-            instructions=instructions,
-            output_type=output_type,
-        )
+        agent = Agent(name="Hermes drafting agent", instructions=instructions, output_type=output_type)
         result = await Runner.run(agent, input_text)
         return result.final_output
 

@@ -1,81 +1,140 @@
 # Hermes
 
-AI workflow prototype for sales enablement in the experience commerce sector.
+Hermes is a FastAPI prototype for sales enablement in experience commerce and location-based entertainment.
 
-Generates personalised outreach, pre-meeting briefings, and mock outbound sequencing from a target account list.
+It is built to demo a simple flow:
 
-It supports:
+1. Load accounts from a CSV or XLSX export.
+2. Generate one structured outreach draft for a selected account.
+3. Generate one markdown briefing note for a selected account.
+4. Add outreach to a local mock queue.
+5. Export sample outputs for review.
 
-- loading target accounts from a CSV or spreadsheet export
-- generating personalised outreach drafts
-- generating pre-meeting briefing notes
-- queueing outreach drafts in a mock outbound send queue
-- exporting outputs as CSV, JSON, and Markdown
-
-## Principles
-
-- Orchestration stays deterministic in Python.
-- Agent-backed generation is reserved for judgement-heavy drafting.
-- Structured outputs are modelled with Pydantic.
-- Guardrails prevent fabricated claims and real sending.
-
-## Project Layout
-
-- `app/main.py`
-- `app/config.py`
-- `app/models.py`
-- `app/data_loader.py`
-- `app/agents.py`
-- `app/workflows.py`
-- `app/send_queue.py`
-- `app/exporters.py`
-- `prompts/`
-- `outputs/`
-- `README.md`
-- `PRD.md`
-- `ARCHITECTURE.md`
-
-## Run
-
-```bash
-python -m uvicorn app.main:app --reload
-```
-
-By default, the app loads sample accounts from `outputs/sample_accounts.csv`. You can point it at a different CSV or spreadsheet export with `HERMES_DATA_PATH`.
-
-## Optional live agent path
-
-The code includes a single toggle for live agent-backed generation. If the key is available and live mode is enabled, the app can route generation through an SDK adapter; otherwise it uses deterministic mock generation.
-
-Set these environment variables in a local `.env` file:
-
-```bash
-HERMES_USE_LIVE_AGENTS=true
-AGENT_API_KEY=your_key_here
-```
-
-If no key is available, the prototype stays fully functional with mock generation.
-
-## API
+## What is included
 
 - `GET /health`
 - `GET /accounts`
+- `GET /accounts/{account_id}`
 - `POST /generate/outreach`
 - `POST /generate/briefing`
 - `POST /queue/outreach`
 - `GET /queue`
 - `POST /export/examples`
 
-## Sample flow
+## Run
 
-1. Load accounts from the sample export.
-2. Generate outreach or briefing notes for selected account IDs.
-3. Queue outreach drafts in the mock send layer.
-4. Export generated examples for review.
+```bash
+python3 -m uvicorn app.main:app --reload
+```
 
-## Notes
+The app loads account data from `data/sample_accounts.csv` by default. To use your own export, set `HERMES_DATA_PATH` to a CSV or XLSX file.
 
-- The send queue is in-memory only.
-- No real delivery integrations are implemented.
-- The sample outputs in `outputs/` are generated from fictional account rows for safe testing.
+If the configured file is missing or malformed, the app stops at startup with a clear error message.
 
+Live agent-backed generation is optional. The prototype works without an API key and stays deterministic by default.
+
+```bash
+export HERMES_USE_LIVE_AGENTS=true
+export AGENT_API_KEY=your_key_here
+```
+
+## Test the accounts endpoints
+
+With the server running, check the loaded accounts:
+
+```bash
+curl http://127.0.0.1:8000/accounts
+```
+
+Inspect one account by id:
+
+```bash
+curl http://127.0.0.1:8000/accounts/ACCT-001
+```
+
+If you point `HERMES_DATA_PATH` at a bad file, the app will fail fast before serving requests. That makes data issues obvious during startup instead of surfacing later in the demo.
+
+## Demo script
+
+### 1. Start with the accounts
+
+Open `GET /accounts` first and show that the file loader normalises the source export into:
+
+- `company_name`
+- `category`
+- `sub_category`
+- `description`
+- `hq_location`
+- `number_of_sites`
+- `estimated_annual_visits`
+- `estimated_average_ticket_price`
+- `estimated_transaction_volume`
+- `estimated_annual_revenue`
+- `region`
+
+Then open `GET /accounts/{account_id}` for one of the returned ids to show a single account record.
+
+### 2. Show outreach generation
+
+Call `POST /generate/outreach` with one `account_id`. Point out that the response is structured JSON with:
+
+- `persona`
+- `role_reasoning`
+- `selected_value_props`
+- `business_insight`
+- `estimated_impact`
+- `message`
+- `risk_flags`
+
+### 3. Show the briefing note
+
+Call `POST /generate/briefing` for the same account and show the markdown sections:
+
+- company overview
+- individual/persona profile
+- value case
+- quantified impact
+- talking points
+- likely objections
+- competitive context
+- recommended next step
+
+### 4. Queue the outreach
+
+Call `POST /queue/outreach` and show that the item is stored locally with:
+
+- `account`
+- `persona`
+- `channel`
+- `message`
+- `status = pending_review`
+- `created_at`
+- `follow_up_day_3`
+- `follow_up_day_7`
+
+### 5. Export examples
+
+Call `POST /export/examples` to produce the sample files in `outputs/`:
+
+- `outreach_examples.csv`
+- `outreach_examples.json`
+- `briefing_note_1.md`
+- `briefing_note_2.md`
+- `send_queue.json`
+
+## Trade-offs
+
+- Orchestration stays in Python so the demo is predictable.
+- Agents are only used for the judgement-heavy drafting path.
+- The send queue is mock-only, so there is no delivery risk.
+- The data model is intentionally small and opinionated to keep the demo readable.
+
+## What productionisation would require
+
+- Authentication and role-based access control
+- Persistent storage for accounts, drafts, and queue state
+- Real delivery integrations with approval workflows
+- Observability, logging, and audit trails
+- Automated tests for loader, validation, and export behavior
+- Better source validation and account enrichment
+- Retry and scheduling infrastructure for follow-up handling
