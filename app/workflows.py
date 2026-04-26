@@ -21,17 +21,10 @@ def _outreach_from_live_agent(account: AccountRecord, request: OutreachRequest) 
     return build_outreach_draft(account, request.channel, request.tone)
 
 
-def _briefing_from_live_agent(account: AccountRecord) -> BriefingNote | None:
-    live_prompt = (
-        "Write a markdown briefing note using only the provided account data. "
-        "Do not invent facts. Keep the note practical and readable. "
-        f"Account JSON: {account.model_dump()}."
-    )
-    return _run_live_agent(
-        BriefingNote,
-        "You generate concise markdown briefing notes with strict source fidelity and no unsupported claims.",
-        live_prompt,
-    )
+def _briefing_from_live_agent(account: AccountRecord, request: BriefingRequest) -> BriefingNote:
+    # Placeholder integration point for a future live-agent implementation.
+    # The fallback remains deterministic so the demo stays self-contained.
+    return build_briefing_markdown(account, request.meeting_persona, request.focus)
 
 
 def generate_outreach(
@@ -52,10 +45,8 @@ def generate_briefing(
 ) -> BriefingNote:
     account = _select_account(accounts, request.account_id)
     if use_live_agents:
-        live_result = _briefing_from_live_agent(account)
-        if isinstance(live_result, BriefingNote):
-            return live_result
-    return build_briefing_markdown(account)
+        return _briefing_from_live_agent(account, request)
+    return build_briefing_markdown(account, request.meeting_persona, request.focus)
 
 
 def queue_outreach(

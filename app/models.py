@@ -38,6 +38,8 @@ class OutreachRequest(BaseModel):
 
 class BriefingRequest(BaseModel):
     account_id: str
+    meeting_persona: str | None = None
+    focus: Literal["commercial", "operations", "growth", "customer_support"] = "commercial"
 
 
 class QueueOutreachRequest(BaseModel):
@@ -63,8 +65,15 @@ class OutreachDraft(BaseModel):
 class BriefingNote(BaseModel):
     account_id: str
     company_name: str
-    markdown: str
-    source_data: dict[str, Any] = Field(default_factory=dict)
+    contact_name: str | None = None
+    contact_role: str | None = None
+    briefing_markdown: str
+    opportunity_summary: str
+    quantified_value_case: str
+    talking_points: list[str] = Field(default_factory=list)
+    likely_objections: list[str] = Field(default_factory=list)
+    recommended_next_step: str
+    guardrail_flags: list[str] = Field(default_factory=list)
 
 
 class QueueItem(BaseModel):

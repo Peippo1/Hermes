@@ -68,6 +68,14 @@ curl -X POST http://127.0.0.1:8000/generate/outreach \
   -d '{"account_id":"ACCT-001","channel":"linkedin","tone":"warm"}'
 ```
 
+Generate a meeting briefing:
+
+```bash
+curl -X POST http://127.0.0.1:8000/generate/briefing \
+  -H 'Content-Type: application/json' \
+  -d '{"account_id":"ACCT-001","meeting_persona":"Commercial Director","focus":"commercial"}'
+```
+
 The response includes:
 
 - `account_id`
@@ -78,6 +86,20 @@ The response includes:
 - `business_insight`
 - `estimated_impact`
 - `message`
+- `guardrail_flags`
+
+The briefing response includes:
+
+- `account_id`
+- `company_name`
+- `contact_name`
+- `contact_role`
+- `briefing_markdown`
+- `opportunity_summary`
+- `quantified_value_case`
+- `talking_points`
+- `likely_objections`
+- `recommended_next_step`
 - `guardrail_flags`
 
 If you point `HERMES_DATA_PATH` at a bad file, the app will fail fast before serving requests. That makes data issues obvious during startup instead of surfacing later in the demo.
@@ -111,12 +133,12 @@ Call `POST /generate/outreach` with one `account_id`. Point out that the respons
 Call `POST /generate/briefing` for the same account and show the markdown sections:
 
 - company overview
-- individual/persona profile
-- value case
-- quantified impact
-- talking points
+- individual / persona profile
+- opportunity analysis
+- quantified value case
+- suggested talking points
 - likely objections
-- competitive context
+- competitive / systems context
 - recommended next step
 
 ### 4. Queue the outreach

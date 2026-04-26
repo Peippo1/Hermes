@@ -32,7 +32,7 @@ def export_outreach_json(items: Iterable[OutreachDraft], path: str | Path) -> Pa
 def export_briefing_markdown(note: BriefingNote, path: str | Path) -> Path:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(note.markdown.rstrip() + "\n", encoding="utf-8")
+    target.write_text(note.briefing_markdown.rstrip() + "\n", encoding="utf-8")
     return target
 
 

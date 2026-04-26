@@ -220,67 +220,260 @@ def build_outreach_draft(account: AccountRecord, channel: str, tone: str) -> Out
     )
 
 
-def build_briefing_markdown(account: AccountRecord) -> BriefingNote:
-    company_overview = (
-        f"{account.company_name} is a {account.category or 'commercial'} account "
-        f"with headquarters in {account.hq_location or 'an unspecified location'} and a regional footprint of "
-        f"{account.number_of_sites if account.number_of_sites is not None else 'unknown'} sites."
-    )
-    persona_profile = (
-        f"Primary persona: {account.contact_role or 'commercial lead'}\n\n"
-        f"Reasoning: {account.contact_name or 'no named contact was supplied'}, so the brief should be written for the role rather than an assumed person."
-    )
-    value_case = (
-        f"The strongest value case is around {account.objective or 'commercial conversion'}, using "
-        f"{account.signal or 'the current account signal'} as the opening hook."
-    )
-    quantified_impact = _estimated_impact(account)
-    talking_points = [
-        "Lead with the commercial problem rather than a product pitch.",
-        "Tie the conversation to current footprint, visit volume, or conversion efficiency where available.",
-        "Keep the first meeting focused on practical next steps and proof criteria.",
+def _focus_label(focus: str) -> str:
+    return {
+        "commercial": "Commercial",
+        "operations": "Operations",
+        "growth": "Growth",
+        "customer_support": "Customer support",
+    }[focus]
+
+
+def _briefing_persona(account: AccountRecord, meeting_persona: str | None) -> str:
+    if meeting_persona:
+        return meeting_persona
+    if account.contact_role:
+        return account.contact_role
+    if account.category:
+        return f"{account.category} lead"
+    return "commercial lead"
+
+
+def _company_overview_lines(account: AccountRecord) -> list[str]:
+    category = account.category or "commercial"
+    sub_category = account.sub_category or "unspecified sub-category"
+    location = account.hq_location or account.region or "an unspecified location"
+    site_count = str(account.number_of_sites) if account.number_of_sites is not None else "not provided"
+    visits = f"{account.estimated_annual_visits:,}" if account.estimated_annual_visits is not None else "not provided"
+    ticket = f"{account.estimated_average_ticket_price:,.2f}" if account.estimated_average_ticket_price is not None else "not provided"
+    revenue = f"{account.estimated_annual_revenue:,.0f}" if account.estimated_annual_revenue is not None else "not provided"
+    lines = [
+        f"{account.company_name} sits in the {category} space, with a sub-category of {sub_category}.",
+        f"The account is based in {location} and is represented here with {site_count} site(s).",
+        f"Estimated annual visits: {visits}. Average ticket price: {ticket}. Estimated annual revenue: {revenue}.",
     ]
-    likely_objections = [
-        "The timing is not right.",
-        "We already have a process for this.",
-        "We need evidence before changing anything.",
-    ]
-    competitive_context = (
-        "The brief should assume the team may compare existing tools, internal processes, and alternative platforms; "
-        "avoid overstating differentiation without evidence."
+    if account.description:
+        description = account.description.rstrip(".")
+        lines.append(f"Description from the source data: {description}.")
+    return lines
+
+
+def _opportunity_areas(account: AccountRecord, focus: str) -> list[str]:
+    areas: list[str] = []
+    if focus in {"commercial", "growth"}:
+        areas.extend([
+            "conversion improvement",
+            "average transaction value / upsell",
+        ])
+    elif focus == "operations":
+        areas.extend([
+            "cost and complexity reduction",
+            "reporting consistency",
+        ])
+    elif focus == "customer_support":
+        areas.extend([
+            "AI customer support",
+            "cost and complexity reduction",
+        ])
+
+    if account.signal:
+        areas.append("AI sales agent for group/corporate enquiries")
+    if account.objective and "support" in account.objective.lower():
+        areas.append("AI customer support")
+    if account.objective and any(term in account.objective.lower() for term in {"book", "booking", "conversion", "grow", "revenue"}):
+        areas.append("conversion improvement")
+
+    deduped: list[str] = []
+    for area in areas:
+        if area not in deduped:
+            deduped.append(area)
+    return deduped[:3]
+
+
+def _opportunity_summary(account: AccountRecord, meeting_persona: str | None, focus: str) -> str:
+    persona = _briefing_persona(account, meeting_persona)
+    areas = _opportunity_areas(account, focus)
+    signal = account.signal or "the current account profile"
+    objective = account.objective or "a practical commercial next step"
+    area_text = ", ".join(areas) if areas else "conversion improvement and operational simplification"
+    return (
+        f"For {persona}, the strongest angle is to connect {signal} to {objective}. "
+        f"That usually points to a small set of value areas: {area_text}. "
+        f"The conversation should stay practical and focus on what would make the first step useful rather than on broad platform claims."
     )
-    recommended_next_step = "Open with one relevant signal, confirm the current priority, and ask for the smallest useful next meeting step."
+
+
+def _quantified_value_case(account: AccountRecord) -> str:
+    parts: list[str] = []
+    if account.estimated_annual_visits is not None and account.estimated_annual_revenue is not None:
+        upside_visits = max(1, round(account.estimated_annual_visits * 0.05))
+        upside_revenue = max(1, round(account.estimated_annual_revenue * 0.05))
+        parts.append(
+            f"5% visit/revenue upside scenario: roughly {upside_visits:,} additional annual visits or about {upside_revenue:,.0f} in annual revenue. "
+            "These are directional estimates based only on the account data."
+        )
+    elif account.estimated_annual_visits is not None:
+        upside_visits = max(1, round(account.estimated_annual_visits * 0.05))
+        parts.append(
+            f"5% visit upside scenario: roughly {upside_visits:,} additional annual visits. This is a directional estimate based only on the account data."
+        )
+    elif account.estimated_annual_revenue is not None:
+        upside_revenue = max(1, round(account.estimated_annual_revenue * 0.05))
+        parts.append(
+            f"5% revenue upside scenario: about {upside_revenue:,.0f} in annual revenue. This is a directional estimate based only on the account data."
+        )
+    else:
+        parts.append("5% visit/revenue upside scenario: not enough data to calculate a directional estimate from the account record.")
+
+    if account.estimated_transaction_volume is not None and account.estimated_average_ticket_price is not None:
+        uplift_per_transaction = account.estimated_average_ticket_price * 0.08
+        annual_uplift = account.estimated_transaction_volume * uplift_per_transaction
+        parts.append(
+            f"8% transaction value uplift scenario: about {uplift_per_transaction:,.2f} more per transaction, which would be roughly {annual_uplift:,.0f} annually if applied across the estimated transaction volume. "
+            "This is a directional estimate based only on the account data."
+        )
+    elif account.estimated_average_ticket_price is not None:
+        uplift_per_transaction = account.estimated_average_ticket_price * 0.08
+        parts.append(
+            f"8% transaction value uplift scenario: about {uplift_per_transaction:,.2f} more per transaction. "
+            "The annual effect cannot be calculated cleanly because transaction volume is missing."
+        )
+    else:
+        parts.append("8% transaction value uplift scenario: not enough pricing data to calculate a directional estimate.")
+
+    return " ".join(parts)
+
+
+def _suggested_questions(account: AccountRecord, focus: str) -> list[str]:
+    questions = [
+        f"What is the current priority behind {account.objective or 'the next commercial step'}?",
+        "Where does the team see the most friction today: conversion, upsell, support, or reporting?",
+        "Which part of the current process still depends on manual follow-up or spreadsheet work?",
+        "What would make a first step feel useful enough to test without adding complexity?",
+    ]
+    if focus == "customer_support":
+        questions[1] = "Where do customers need the most help today: booking, pre-visit questions, or post-visit support?"
+    elif focus == "operations":
+        questions[1] = "Where do manual steps or reporting handoffs create the most friction?"
+    elif focus == "growth":
+        questions[1] = "Which part of the commercial funnel needs the most help: discovery, conversion, or repeat visits?"
+    return questions
+
+
+def _likely_objections() -> list[tuple[str, str]]:
+    return [
+        (
+            "We already have a process for this.",
+            "That is usually the right starting point. The useful question is whether the current process leaves room for a lighter, faster first step.",
+        ),
+        (
+            "Timing is not ideal.",
+            "Fair point. A short review can still clarify whether there is a low-effort way to test the idea later.",
+        ),
+        (
+            "We need to avoid adding complexity.",
+            "Agreed. The conversation should stay focused on one practical use case and the smallest useful next step.",
+        ),
+    ]
+
+
+def _systems_context() -> str:
+    return (
+        "Most teams in this space operate across separate ticketing, booking, CRM, support, spreadsheet, and reporting tools. "
+        "The briefing should assume the opportunity is about making those systems work together more cleanly, not about replacing everything at once."
+    )
+
+
+def _recommended_next_step(account: AccountRecord, focus: str) -> str:
+    objective = account.objective or "the current commercial priority"
+    focus_value = _focus_label(focus).lower()
+    return (
+        f"Propose a short follow-up focused on {objective.lower()} and ask for one specific workflow or customer journey to review first. "
+        f"Keep the next step narrow enough to assess {focus_value} value without adding process overhead."
+    )
+
+
+def _briefing_markdown(account: AccountRecord, meeting_persona: str | None, focus: str) -> str:
+    overview = _company_overview_lines(account)
+    persona = _briefing_persona(account, meeting_persona)
+    if account.contact_name and account.contact_role:
+        persona_block = f"Primary contact: {account.contact_name} ({account.contact_role})."
+    elif account.contact_name:
+        persona_block = f"Primary contact: {account.contact_name}."
+    elif account.contact_role:
+        persona_block = f"Likely persona: {account.contact_role}."
+    else:
+        persona_block = f"Likely persona: {persona}."
+
     markdown = "\n".join(
         [
-            "# Briefing note",
+            f"# Meeting Brief: {account.company_name}",
             "",
-            "## Company overview",
-            company_overview,
+            "## 1. Company Overview",
+            *[f"- {line}" for line in overview],
             "",
-            "## Individual/persona profile",
-            persona_profile,
+            "## 2. Individual / Persona Profile",
+            persona_block,
             "",
-            "## Value case",
-            value_case,
+            "## 3. Opportunity Analysis",
+            _opportunity_summary(account, meeting_persona, focus),
             "",
-            "## Quantified impact",
-            quantified_impact,
+            "## 4. Quantified Value Case",
+            _quantified_value_case(account),
             "",
-            "## Talking points",
-            *[f"- {point}" for point in talking_points],
+            "## 5. Suggested Talking Points",
+            *[f"- {question}" for question in _suggested_questions(account, focus)],
             "",
-            "## Likely objections",
-            *[f"- {point}" for point in likely_objections],
+            "## 6. Likely Objections",
+            *[
+                f"- Objection: {objection} Suggested response: {response}"
+                for objection, response in _likely_objections()
+            ],
             "",
-            "## Competitive context",
-            competitive_context,
+            "## 7. Competitive / Systems Context",
+            _systems_context(),
             "",
-            "## Recommended next step",
-            recommended_next_step,
+            "## 8. Recommended Next Step",
+            _recommended_next_step(account, focus),
             "",
         ]
     )
-    return BriefingNote(account_id=account.account_id, company_name=account.company_name, markdown=markdown, source_data=account.model_dump())
+    return markdown
+
+
+def _briefing_guardrail_flags(account: AccountRecord, markdown: str) -> list[str]:
+    flags: list[str] = []
+    if len(markdown.split()) > 1000:
+        flags.append("Briefing note is longer than the requested maximum.")
+    if not account.contact_name:
+        flags.append("No contact name was supplied, so the note is framed for the likely persona.")
+    if not account.contact_role:
+        flags.append("No contact role was supplied, so the note avoids assuming a named job title.")
+    if not account.estimated_annual_visits and not account.estimated_annual_revenue and not account.estimated_transaction_volume:
+        flags.append("Key scale data is missing, so the quantified value case is limited.")
+    return flags
+
+
+def build_briefing_markdown(account: AccountRecord, meeting_persona: str | None = None, focus: str = "commercial") -> BriefingNote:
+    briefing_markdown = _briefing_markdown(account, meeting_persona, focus)
+    opportunity_summary = _opportunity_summary(account, meeting_persona, focus)
+    quantified_value_case = _quantified_value_case(account)
+    talking_points = _suggested_questions(account, focus)
+    likely_objections = [objection for objection, _ in _likely_objections()]
+    recommended_next_step = _recommended_next_step(account, focus)
+    return BriefingNote(
+        account_id=account.account_id,
+        company_name=account.company_name,
+        contact_name=account.contact_name,
+        contact_role=account.contact_role,
+        briefing_markdown=briefing_markdown,
+        opportunity_summary=opportunity_summary,
+        quantified_value_case=quantified_value_case,
+        talking_points=talking_points,
+        likely_objections=likely_objections,
+        recommended_next_step=recommended_next_step,
+        guardrail_flags=_briefing_guardrail_flags(account, briefing_markdown),
+    )
 
 
 def _run_live_agent(output_type: type[Any], instructions: str, input_text: str) -> Any | None:
