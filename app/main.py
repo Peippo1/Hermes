@@ -63,17 +63,26 @@ def get_account(account_id: str) -> AccountRecord:
 
 @app.post("/generate/outreach", response_model=OutreachDraft)
 def generate_outreach_endpoint(request: OutreachRequest) -> OutreachDraft:
-    return generate_outreach(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
+    try:
+        return generate_outreach(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @app.post("/generate/briefing", response_model=BriefingNote)
 def generate_briefing_endpoint(request: BriefingRequest) -> BriefingNote:
-    return generate_briefing(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
+    try:
+        return generate_briefing(app.state.runtime.accounts, request, use_live_agents=config.use_live_agents)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @app.post("/queue/outreach")
 def queue_outreach_endpoint(request: QueueOutreachRequest) -> dict[str, object]:
-    queued = queue_outreach(app.state.runtime.accounts, request, app.state.runtime.queue, use_live_agents=config.use_live_agents)
+    try:
+        queued = queue_outreach(app.state.runtime.accounts, request, app.state.runtime.queue, use_live_agents=config.use_live_agents)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return {"item": queued.model_dump(mode="json"), "queue_size": len(app.state.runtime.queue.items)}
 
 

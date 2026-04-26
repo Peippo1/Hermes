@@ -52,6 +52,34 @@ Inspect one account by id:
 curl http://127.0.0.1:8000/accounts/ACCT-001
 ```
 
+Generate outreach with the default email + concise tone:
+
+```bash
+curl -X POST http://127.0.0.1:8000/generate/outreach \
+  -H 'Content-Type: application/json' \
+  -d '{"account_id":"ACCT-001"}'
+```
+
+Generate outreach with the LinkedIn + warm variant:
+
+```bash
+curl -X POST http://127.0.0.1:8000/generate/outreach \
+  -H 'Content-Type: application/json' \
+  -d '{"account_id":"ACCT-001","channel":"linkedin","tone":"warm"}'
+```
+
+The response includes:
+
+- `account_id`
+- `company_name`
+- `contact_name`
+- `contact_role`
+- `selected_value_props`
+- `business_insight`
+- `estimated_impact`
+- `message`
+- `guardrail_flags`
+
 If you point `HERMES_DATA_PATH` at a bad file, the app will fail fast before serving requests. That makes data issues obvious during startup instead of surfacing later in the demo.
 
 ## Demo script
@@ -76,15 +104,7 @@ Then open `GET /accounts/{account_id}` for one of the returned ids to show a sin
 
 ### 2. Show outreach generation
 
-Call `POST /generate/outreach` with one `account_id`. Point out that the response is structured JSON with:
-
-- `persona`
-- `role_reasoning`
-- `selected_value_props`
-- `business_insight`
-- `estimated_impact`
-- `message`
-- `risk_flags`
+Call `POST /generate/outreach` with one `account_id`. Point out that the response is structured JSON with the company name, contact fields, selected value props, business insight, estimated impact, message, and guardrail flags.
 
 ### 3. Show the briefing note
 

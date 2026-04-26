@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
-from .agents import _run_live_agent, build_briefing_markdown, build_outreach_draft
+from .agents import build_briefing_markdown, build_outreach_draft
 from .models import AccountRecord, BriefingNote, BriefingRequest, OutreachDraft, OutreachRequest, QueueItem, QueueOutreachRequest
 from .send_queue import SendQueue
 
@@ -15,18 +15,10 @@ def _select_account(accounts: Iterable[AccountRecord], account_id: str) -> Accou
     raise ValueError(f"Account not found: {account_id}")
 
 
-def _outreach_from_live_agent(account: AccountRecord, request: OutreachRequest) -> OutreachDraft | None:
-    live_prompt = (
-        "Write a structured cold outreach draft using only the provided account data. "
-        "Do not invent facts or named contacts. Keep it concise and non-salesy. "
-        f"Account JSON: {account.model_dump()}. "
-        f"Request: {request.model_dump()}."
-    )
-    return _run_live_agent(
-        OutreachDraft,
-        "You generate structured cold outreach with strict source fidelity, no fabrication, and no real sending.",
-        live_prompt,
-    )
+def _outreach_from_live_agent(account: AccountRecord, request: OutreachRequest) -> OutreachDraft:
+    # Placeholder integration point for a future live-agent implementation.
+    # The fallback remains deterministic so the demo stays self-contained.
+    return build_outreach_draft(account, request.channel, request.tone)
 
 
 def _briefing_from_live_agent(account: AccountRecord) -> BriefingNote | None:
@@ -49,10 +41,8 @@ def generate_outreach(
 ) -> OutreachDraft:
     account = _select_account(accounts, request.account_id)
     if use_live_agents:
-        live_result = _outreach_from_live_agent(account, request)
-        if isinstance(live_result, OutreachDraft):
-            return live_result
-    return build_outreach_draft(account, request.channel, request.tone, request.goal)
+        return _outreach_from_live_agent(account, request)
+    return build_outreach_draft(account, request.channel, request.tone)
 
 
 def generate_briefing(
@@ -74,14 +64,18 @@ def queue_outreach(
     queue: SendQueue,
     use_live_agents: bool = False,
 ) -> QueueItem:
-    draft = generate_outreach(accounts, OutreachRequest(account_id=request.account_id, channel=request.channel, tone=request.tone, goal=request.goal), use_live_agents=use_live_agents)
+    draft = generate_outreach(
+        accounts,
+        OutreachRequest(account_id=request.account_id, channel=request.channel, tone=request.tone),
+        use_live_agents=use_live_agents,
+    )
     created_at = datetime.now(timezone.utc)
     item = QueueItem(
         account={
             "account_id": draft.account_id,
             "company_name": draft.company_name,
         },
-        persona=draft.persona,
+        persona=draft.contact_role or "commercial lead",
         channel=draft.channel,
         message=draft.message,
         created_at=created_at,
@@ -89,4 +83,3 @@ def queue_outreach(
         follow_up_day_7=(created_at + timedelta(days=7)).isoformat(),
     )
     return queue.enqueue(item)
-

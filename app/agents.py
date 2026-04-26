@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from hashlib import sha256
+import re
 from typing import Any
 
 from .models import AccountRecord, BriefingNote, OutreachDraft
@@ -27,101 +28,166 @@ def _pick(sequence: list[str], seed: int) -> str:
     return sequence[seed % len(sequence)]
 
 
-def _persona_for_account(account: AccountRecord) -> str:
+def _persona_for_queue(account: AccountRecord) -> str:
     if account.contact_role:
         return account.contact_role
     if account.category:
-        return f"{account.category} leader"
+        return f"{account.category} lead"
     return "commercial lead"
 
 
-def _role_reasoning(account: AccountRecord) -> str:
-    parts = [account.category, account.sub_category, account.objective]
-    pieces = [part for part in parts if part]
-    if pieces:
-        return f"The available record points to {'; '.join(pieces)}."
-    return "The record has enough commercial context to justify a practical first-touch message."
-
-
 def _value_props(account: AccountRecord) -> list[str]:
-    props = [
-        account.signal or "current commercial activity in the account",
-        account.objective or "a clearer path to commercial conversion",
-        account.description or "the account's operating model and footprint",
-    ]
-    return [prop for prop in props if prop]
+    props: list[str] = []
+    if account.number_of_sites:
+        site_label = "site" if account.number_of_sites == 1 else "sites"
+        props.append(f"Support commercial consistency across {account.number_of_sites} {site_label}")
+    if account.objective:
+        props.append(f"Align the first conversation to the stated objective: {account.objective}")
+    if account.signal:
+        props.append(f"Use the current signal as a practical opening: {account.signal}")
+    if not props and account.description:
+        props.append(f"Reflect the operating model described in the account record: {account.description}")
+    if not props:
+        props.append("Open a practical commercial conversation grounded in the account record")
+    return props[:3]
 
 
 def _business_insight(account: AccountRecord) -> str:
     location = account.hq_location or account.region or "the account's market"
-    if account.estimated_annual_revenue and account.number_of_sites:
+    if account.number_of_sites and account.objective:
+        site_phrase = "a single-site footprint" if account.number_of_sites == 1 else f"an {account.number_of_sites}-site footprint"
         return (
-            f"With {account.number_of_sites} sites and an estimated annual revenue of "
-            f"{account.estimated_annual_revenue:,.0f}, {account.company_name} appears positioned to benefit from sharper conversion, "
-            f"repeat visit, or group booking improvements in {location}."
+            f"{account.company_name} has {site_phrase} in {location}, "
+            f"so the first message should stay focused on {account.objective} and avoid broad feature claims."
         )
-    return f"The account appears to have a meaningful commercial opportunity in {location}, based on the available record."
+    if account.signal:
+        return (
+            f"{account.company_name} has a clear current signal in {location}, so the outreach should stay tied to that trigger."
+        )
+    return f"The account has enough commercial context to justify a short, practical first-touch message in {location}."
 
 
 def _estimated_impact(account: AccountRecord) -> str:
     visits = account.estimated_annual_visits
     revenue = account.estimated_annual_revenue
-    ticket = account.estimated_average_ticket_price
-    if visits and revenue and ticket:
+    if visits and revenue:
         uplift_visits = max(1, round(visits * 0.05))
         uplift_revenue = max(1, round(revenue * 0.05))
         return (
-            f"A modest 5% uplift could mean roughly {uplift_visits:,} additional annual visits "
-            f"or about {uplift_revenue:,.0f} in annual revenue, depending on the commercial lever."
+            f"A modest 5% uplift from the current base would be roughly {uplift_visits:,} additional annual visits "
+            f"or about {uplift_revenue:,.0f} in annual revenue, depending on the lever."
         )
     if revenue:
         uplift_revenue = max(1, round(revenue * 0.05))
         return f"A modest 5% uplift could mean about {uplift_revenue:,.0f} in annual revenue."
+    if visits:
+        uplift_visits = max(1, round(visits * 0.05))
+        return f"A modest 5% uplift could mean about {uplift_visits:,} additional annual visits."
     return "A small uplift in conversion or repeat visits would likely justify a follow-up commercial conversation."
 
 
-def _risk_flags(account: AccountRecord, message: str) -> list[str]:
-    flags: list[str] = [
-        "Do not present unsupported claims as facts.",
-        "Keep the tone credible and non-salesy.",
-        "No real sending is performed from this prototype.",
+def _tone_opening(tone: str) -> str:
+    return {
+        "concise": "I'm sharing one practical idea based on the account record.",
+        "warm": "I noticed a few details in the account record that may be relevant.",
+        "direct": "A short, practical note based on the account record:",
+    }[tone]
+
+
+def _channel_suffix(channel: str) -> str:
+    return {
+        "email": "If this is useful, I can send a short follow-up with the idea in plain terms.",
+        "linkedin": "If useful, I can share a short version here.",
+    }[channel]
+
+
+def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
+    greeting = account.contact_name or "there"
+    opening = _tone_opening(tone)
+    value_prop = _value_props(account)[0]
+    business_line = _business_insight(account)
+    suffix = _channel_suffix(channel)
+    closing = "Best,\nHermes"
+    if channel == "linkedin":
+        closing = "Hermes"
+    message = (
+        f"Hi {greeting}, {opening} {business_line} "
+        f"The most relevant angle looks like {value_prop.lower()}. "
+        f"{suffix} {closing}"
+    )
+    words = message.split()
+    if len(words) > 140:
+        message = " ".join(words[:140])
+    return message
+
+
+def _named_claim_tokens(account: AccountRecord) -> set[str]:
+    tokens: set[str] = {
+        "Hi",
+        "I",
+        "I'm",
+        "If",
+        "The",
+        "A",
+        "As",
+        "Best",
+        "Hermes",
+        "This",
+        "For",
+        "With",
+        "On",
+    }
+    source_fields = [
+        account.company_name,
+        account.contact_name,
+        account.contact_role,
+        account.hq_location,
+        account.region,
     ]
+    for field in source_fields:
+        if not field:
+            continue
+        for token in re.findall(r"[A-Za-z0-9&'-]+", field):
+            if token:
+                tokens.add(token)
+    return tokens
+
+
+def _guardrail_flags(account: AccountRecord, message: str, tone: str) -> list[str]:
+    flags: list[str] = []
+    if len(message.split()) > 140:
+        flags.append("Message exceeds the 140-word limit.")
+    if tone not in {"concise", "warm", "direct"}:
+        flags.append("Tone falls outside the supported set.")
     if not account.contact_name:
-        flags.append("No named contact provided; keep the greeting generic.")
-    if len(message.split()) > 170:
-        flags.append("Outreach is longer than a concise cold message should be.")
+        flags.append("No named contact provided, so the greeting stays generic.")
     if not account.signal and not account.objective and not account.description:
-        flags.append("Source data is thin; avoid unsupported claims.")
-    if account.contact_name:
-        flags.append("Named contact can be used only because it was present in the source file.")
+        flags.append("Source data is thin, so the message avoids unsupported claims.")
+    supported_tokens = _named_claim_tokens(account)
+    message_tokens = set(re.findall(r"\b[A-Z][A-Za-z0-9&'-]*\b", message))
+    unexpected_tokens = sorted(
+        token for token in message_tokens if token not in supported_tokens and token not in {"UK"}
+    )
+    if unexpected_tokens:
+        flags.append(f"Unsupported named claims detected: {', '.join(unexpected_tokens)}.")
     return flags
 
 
-def build_outreach_draft(account: AccountRecord, channel: str, tone: str, goal: str) -> OutreachDraft:
-    persona = _persona_for_account(account)
-    role_reasoning = _role_reasoning(account)
+def build_outreach_draft(account: AccountRecord, channel: str, tone: str) -> OutreachDraft:
     selected_value_props = _value_props(account)
     business_insight = _business_insight(account)
     estimated_impact = _estimated_impact(account)
-    opener = account.contact_name if account.contact_name else "there"
-    message = (
-        f"Hi {opener},\n\n"
-        f"{business_insight} "
-        f"I thought it would be useful to share one idea that could support {goal} without adding unnecessary noise. "
-        f"Specifically, the record suggests {selected_value_props[0] if selected_value_props else 'a clear commercial opportunity'}.\n\n"
-        f"If it is relevant, I can share a short version tailored to the current priorities.\n\n"
-        f"Best,\nHermes"
-    )
+    message = _compose_message(account, channel, tone)
     return OutreachDraft(
         account_id=account.account_id,
         company_name=account.company_name,
-        persona=persona,
-        role_reasoning=role_reasoning,
+        contact_name=account.contact_name,
+        contact_role=account.contact_role,
         selected_value_props=selected_value_props,
         business_insight=business_insight,
         estimated_impact=estimated_impact,
         message=message,
-        risk_flags=_risk_flags(account, message),
+        guardrail_flags=_guardrail_flags(account, message, tone),
         channel=channel,
         tone=tone,
     )

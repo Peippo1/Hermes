@@ -33,8 +33,7 @@ class AccountRecord(BaseModel):
 class OutreachRequest(BaseModel):
     account_id: str
     channel: Literal["email", "linkedin"] = "email"
-    tone: str = "clear, warm, concise"
-    goal: str = "book a discovery conversation"
+    tone: Literal["concise", "warm", "direct"] = "concise"
 
 
 class BriefingRequest(BaseModel):
@@ -44,22 +43,21 @@ class BriefingRequest(BaseModel):
 class QueueOutreachRequest(BaseModel):
     account_id: str
     channel: Literal["email", "linkedin"] = "email"
-    tone: str = "clear, warm, concise"
-    goal: str = "book a discovery conversation"
+    tone: Literal["concise", "warm", "direct"] = "concise"
 
 
 class OutreachDraft(BaseModel):
     account_id: str
     company_name: str
-    persona: str
-    role_reasoning: str
+    contact_name: str | None = None
+    contact_role: str | None = None
     selected_value_props: list[str] = Field(default_factory=list)
     business_insight: str
     estimated_impact: str
     message: str
-    risk_flags: list[str] = Field(default_factory=list)
-    channel: str = "email"
-    tone: str = "clear, warm, concise"
+    guardrail_flags: list[str] = Field(default_factory=list)
+    channel: Literal["email", "linkedin"] = "email"
+    tone: Literal["concise", "warm", "direct"] = "concise"
 
 
 class BriefingNote(BaseModel):
@@ -94,4 +92,3 @@ class ExportArtifacts(BaseModel):
     briefing_note_1_path: str
     briefing_note_2_path: str
     send_queue_path: str
-
