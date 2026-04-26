@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import {
   buildMockArtifacts,
   buildMockExport,
@@ -572,6 +573,7 @@ export default function App() {
           </article>
         </section>
       </main>
+      <Analytics />
     </div>
   );
 }
