@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -77,14 +77,19 @@ class BriefingNote(BaseModel):
 
 
 class QueueItem(BaseModel):
-    account: dict[str, Any]
-    persona: str
+    queue_id: str
+    account_id: str
+    company_name: str
+    contact_name: str | None = None
+    contact_role: str | None = None
     channel: str
     message: str
+    selected_value_props: list[str] = Field(default_factory=list)
     status: str = "pending_review"
     created_at: datetime
     follow_up_day_3: str
     follow_up_day_7: str
+    guardrail_flags: list[str] = Field(default_factory=list)
 
 
 class AccountsResponse(BaseModel):
@@ -93,6 +98,7 @@ class AccountsResponse(BaseModel):
 
 class QueueResponse(BaseModel):
     items: list[QueueItem]
+    queue_size: int
 
 
 class ExportArtifacts(BaseModel):

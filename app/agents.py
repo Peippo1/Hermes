@@ -98,6 +98,19 @@ def _estimated_impact(account: AccountRecord) -> str:
     return "A small uplift in conversion or repeat visits would likely justify a follow-up commercial conversation."
 
 
+def _format_currency(value: float | int) -> str:
+    amount = float(value)
+    if abs(amount) >= 1_000_000:
+        text = f"£{amount / 1_000_000:.2f}m"
+        return text.replace(".00m", "m").replace(".0m", "m")
+    if abs(amount) >= 1_000:
+        text = f"£{amount / 1_000:.1f}k"
+        return text.replace(".0k", "k")
+    if amount.is_integer():
+        return f"£{int(amount)}"
+    return f"£{amount:.2f}"
+
+
 def _tone_opening(tone: str) -> str:
     return {
         "concise": "Saw a few signals that made this worth a note.",
@@ -245,8 +258,8 @@ def _company_overview_lines(account: AccountRecord) -> list[str]:
     location = account.hq_location or account.region or "an unspecified location"
     site_count = str(account.number_of_sites) if account.number_of_sites is not None else "not provided"
     visits = f"{account.estimated_annual_visits:,}" if account.estimated_annual_visits is not None else "not provided"
-    ticket = f"{account.estimated_average_ticket_price:,.2f}" if account.estimated_average_ticket_price is not None else "not provided"
-    revenue = f"{account.estimated_annual_revenue:,.0f}" if account.estimated_annual_revenue is not None else "not provided"
+    ticket = _format_currency(account.estimated_average_ticket_price) if account.estimated_average_ticket_price is not None else "not provided"
+    revenue = _format_currency(account.estimated_annual_revenue) if account.estimated_annual_revenue is not None else "not provided"
     lines = [
         f"{account.company_name} sits in the {category} space, with a sub-category of {sub_category}.",
         f"The account is based in {location} and is represented here with {site_count} site(s).",
@@ -298,7 +311,7 @@ def _opportunity_summary(account: AccountRecord, meeting_persona: str | None, fo
     area_text = ", ".join(areas) if areas else "conversion improvement and operational simplification"
     return (
         f"For {persona}, the strongest angle is to connect {signal} to {objective}. "
-        f"That usually points to a small set of value areas: {area_text}. "
+        f"This points to a small set of value areas: {area_text}. "
         f"The conversation should stay practical and focus on what would make the first step useful rather than on broad platform claims."
     )
 
@@ -309,7 +322,7 @@ def _quantified_value_case(account: AccountRecord) -> str:
         upside_visits = max(1, round(account.estimated_annual_visits * 0.05))
         upside_revenue = max(1, round(account.estimated_annual_revenue * 0.05))
         parts.append(
-            f"5% visit/revenue upside scenario: roughly {upside_visits:,} additional annual visits or about {upside_revenue:,.0f} in annual revenue. "
+            f"5% visit/revenue upside scenario: roughly {upside_visits:,} additional annual visits or about {_format_currency(upside_revenue)} in annual revenue. "
             "These are directional estimates based only on the account data."
         )
     elif account.estimated_annual_visits is not None:
@@ -320,7 +333,7 @@ def _quantified_value_case(account: AccountRecord) -> str:
     elif account.estimated_annual_revenue is not None:
         upside_revenue = max(1, round(account.estimated_annual_revenue * 0.05))
         parts.append(
-            f"5% revenue upside scenario: about {upside_revenue:,.0f} in annual revenue. This is a directional estimate based only on the account data."
+            f"5% revenue upside scenario: about {_format_currency(upside_revenue)} in annual revenue. This is a directional estimate based only on the account data."
         )
     else:
         parts.append("5% visit/revenue upside scenario: not enough data to calculate a directional estimate from the account record.")
@@ -329,13 +342,13 @@ def _quantified_value_case(account: AccountRecord) -> str:
         uplift_per_transaction = account.estimated_average_ticket_price * 0.08
         annual_uplift = account.estimated_transaction_volume * uplift_per_transaction
         parts.append(
-            f"8% transaction value uplift scenario: about {uplift_per_transaction:,.2f} more per transaction, which would be roughly {annual_uplift:,.0f} annually if applied across the estimated transaction volume. "
+            f"8% transaction value uplift scenario: about {_format_currency(uplift_per_transaction)} more per transaction, which would be roughly {_format_currency(annual_uplift)} annually if applied across the estimated transaction volume. "
             "This is a directional estimate based only on the account data."
         )
     elif account.estimated_average_ticket_price is not None:
         uplift_per_transaction = account.estimated_average_ticket_price * 0.08
         parts.append(
-            f"8% transaction value uplift scenario: about {uplift_per_transaction:,.2f} more per transaction. "
+            f"8% transaction value uplift scenario: about {_format_currency(uplift_per_transaction)} more per transaction. "
             "The annual effect cannot be calculated cleanly because transaction volume is missing."
         )
     else:

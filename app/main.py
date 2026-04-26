@@ -88,12 +88,13 @@ def queue_outreach_endpoint(request: QueueOutreachRequest) -> dict[str, object]:
 
 @app.get("/queue", response_model=QueueResponse)
 def list_queue() -> QueueResponse:
-    return QueueResponse(items=app.state.runtime.queue.list_items())
+    items = app.state.runtime.queue.list_items()
+    return QueueResponse(items=items, queue_size=len(items))
 
 
 @app.post("/export/examples")
 def export_examples() -> dict[str, object]:
-    selected_accounts = app.state.runtime.accounts[:2]
+    selected_accounts = app.state.runtime.accounts[:3]
     outreach_items = [
         generate_outreach(
             app.state.runtime.accounts,
@@ -109,7 +110,7 @@ def export_examples() -> dict[str, object]:
             use_live_agents=False,
         )
         for account in selected_accounts
-    ]
+    ][:2]
     generated_dir = Path(config.generated_dir)
     outreach_csv_path = export_outreach_csv(outreach_items, generated_dir / "outreach_examples.csv")
     outreach_json_path = export_outreach_json(outreach_items, generated_dir / "outreach_examples.json")

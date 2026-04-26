@@ -104,6 +104,15 @@ The briefing response includes:
 
 If you point `HERMES_DATA_PATH` at a bad file, the app will fail fast before serving requests. That makes data issues obvious during startup instead of surfacing later in the demo.
 
+## Demo Walkthrough
+
+1. Check `GET /health`.
+2. List accounts with `GET /accounts`.
+3. Generate outreach with `POST /generate/outreach`.
+4. Generate a briefing with `POST /generate/briefing`.
+5. Queue outreach with `POST /queue/outreach`.
+6. Export sample outputs with `POST /export/examples`.
+
 ## Demo script
 
 ### 1. Start with the accounts
@@ -163,6 +172,8 @@ Call `POST /export/examples` to produce the sample files in `outputs/`:
 - `briefing_note_1.md`
 - `briefing_note_2.md`
 - `send_queue.json`
+
+The bundle contains 3 outreach examples, 2 briefing notes, and 3 queued outreach items.
 
 ## Trade-offs
 

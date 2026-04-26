@@ -62,15 +62,17 @@ def queue_outreach(
     )
     created_at = datetime.now(timezone.utc)
     item = QueueItem(
-        account={
-            "account_id": draft.account_id,
-            "company_name": draft.company_name,
-        },
-        persona=draft.contact_role or "commercial lead",
+        queue_id="",
+        account_id=draft.account_id,
+        company_name=draft.company_name,
+        contact_name=draft.contact_name,
+        contact_role=draft.contact_role,
         channel=draft.channel,
         message=draft.message,
+        selected_value_props=draft.selected_value_props,
         created_at=created_at,
         follow_up_day_3=(created_at + timedelta(days=3)).isoformat(),
         follow_up_day_7=(created_at + timedelta(days=7)).isoformat(),
+        guardrail_flags=draft.guardrail_flags,
     )
     return queue.enqueue(item)
