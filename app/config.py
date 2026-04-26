@@ -22,6 +22,7 @@ class AppConfig:
     generated_dir: Path = OUTPUT_DIR
     prompts_dir: Path = PROMPTS_DIR
     use_live_agents: bool = os.getenv("HERMES_USE_LIVE_AGENTS", "false").lower() in {"1", "true", "yes"}
+    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     agent_api_key: str | None = os.getenv("OPENAI_API_KEY") or os.getenv("AGENT_API_KEY")
     model_name: str = os.getenv("HERMES_MODEL", "gpt-4.1-mini")
     cors_origins: str = os.getenv("CORS_ORIGINS", "")

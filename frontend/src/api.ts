@@ -25,19 +25,36 @@ export function getApiBaseUrl(): string {
   return trimSlash(baseUrl);
 }
 
+export class ApiError extends Error {
+  kind: 'backend-unavailable' | 'request-failed';
+  status?: number;
+
+  constructor(message: string, kind: 'backend-unavailable' | 'request-failed', status?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.kind = kind;
+    this.status = status;
+  }
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   if (!hasApiBaseUrl()) {
-    throw new Error('API base URL is not configured.');
+    throw new ApiError('API base URL is not configured.', 'backend-unavailable');
   }
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {})
-    },
-    ...init
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {})
+      },
+      ...init
+    });
+  } catch {
+    throw new ApiError('Backend unavailable.', 'backend-unavailable');
+  }
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw new ApiError(`Request failed with status ${response.status}`, 'request-failed', response.status);
   }
   return (await response.json()) as T;
 }
@@ -78,4 +95,3 @@ export async function exportExamples(): Promise<ExportExamplesResponse & { artif
     body: JSON.stringify({})
   });
 }
-

@@ -38,13 +38,15 @@ python3 -m uvicorn app.main:app --reload
 
 The app fails fast at startup if the data file is missing or malformed.
 
-Live-agent mode is optional. The backend remains deterministic by default.
+Live-agent mode is optional. Deterministic generation remains the default path.
 
 ```bash
 export HERMES_USE_LIVE_AGENTS=true
 export OPENAI_API_KEY=your_key_here
 export HERMES_MODEL=gpt-4.1-mini
 ```
+
+If live mode is enabled but the OpenAI key is missing or the live call fails, Hermes falls back to deterministic output and adds a guardrail flag explaining the fallback.
 
 ## Frontend
 
@@ -82,11 +84,19 @@ To deploy the backend on Render:
 4. Set the start command to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 5. Add environment variables:
    - `OPENAI_API_KEY` if live-agent mode will be used
-   - `HERMES_USE_LIVE_AGENTS=false`
-   - `HERMES_MODEL=gpt-4.1-mini`
+   - `HERMES_USE_LIVE_AGENTS=false` by default, or `true` to enable live generation
+   - `HERMES_MODEL=gpt-4.1-mini` or another supported model name
    - `CORS_ORIGINS` with the frontend origin, such as the local Vite URL and the eventual Vercel URL
    - `HERMES_DATA_PATH` only if you want to override the bundled sample export
 6. Set the health check path to `/health`.
+
+To enable live generation on Render, set:
+
+```bash
+HERMES_USE_LIVE_AGENTS=true
+OPENAI_API_KEY=your_key_here
+HERMES_MODEL=gpt-4.1-mini
+```
 
 The backend starts with the bundled sample data by default, so no extra database setup is required for the first deployment.
 
