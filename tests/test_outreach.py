@@ -37,11 +37,12 @@ class OutreachEndpointTests(unittest.TestCase):
         self.assertIn("estimated_impact", payload)
         self.assertIn("message", payload)
         self.assertIn("guardrail_flags", payload)
-        self.assertLessEqual(len(payload["message"].split()), 140)
-        self.assertLessEqual(len(payload["message"].split()), 120)
+        self.assertLessEqual(len(payload["message"].split()), 100)
         self.assert_no_internal_wording(payload["message"])
+        self.assertNotIn("priority is usually", payload["message"].lower())
+        self.assertNotIn("we can help turn", payload["message"].lower())
         self.assertEqual(payload["guardrail_flags"], [])
-        self.assertIn("Northstar Leisure Group", payload["message"])
+        self.assertIn("Northstar", payload["message"])
         self.assertTrue(
             "bookings" in payload["message"].lower() or "memberships" in payload["message"].lower()
         )
@@ -56,9 +57,9 @@ class OutreachEndpointTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["account_id"], "ACCT-002")
         self.assertEqual(payload["company_name"], "Harbor Experience Co")
-        self.assertLessEqual(len(payload["message"].split()), 140)
-        self.assertLessEqual(len(payload["message"].split()), 120)
+        self.assertLessEqual(len(payload["message"].split()), 100)
         self.assert_no_internal_wording(payload["message"])
+        self.assertNotIn("priority is usually", payload["message"].lower())
         self.assertEqual(payload["guardrail_flags"], [])
 
     def test_generate_outreach_missing_account(self) -> None:

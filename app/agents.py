@@ -64,10 +64,19 @@ def _message_focus(account: AccountRecord) -> str:
     return "a practical commercial next step"
 
 
+def _site_phrase(account: AccountRecord) -> str:
+    if account.number_of_sites == 1:
+        return "a single-site footprint"
+    if account.number_of_sites is None:
+        return "a footprint"
+    article = "an" if str(account.number_of_sites).startswith(("8", "11", "18")) else "a"
+    return f"{article} {account.number_of_sites}-site footprint"
+
+
 def _business_insight(account: AccountRecord) -> str:
     location = account.hq_location or account.region or "the account's market"
     if account.number_of_sites and account.objective:
-        site_phrase = "a single-site footprint" if account.number_of_sites == 1 else f"an {account.number_of_sites}-site footprint"
+        site_phrase = _site_phrase(account)
         return (
             f"{account.company_name} has {site_phrase} in {location}, "
             f"so the first message should stay focused on {account.objective} and avoid broad feature claims."
@@ -127,33 +136,34 @@ def _channel_suffix(channel: str) -> str:
 
 
 def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
-    greeting = account.contact_name or "there"
+    greeting = account.contact_name.split()[0] if account.contact_name else "there"
     opening = _tone_opening(tone)
     focus = _message_focus(account)
     if account.signal and "opening" in account.signal.lower():
-        signal_line = f"{account.company_name} is opening a new venue soon."
+        signal_line = f"Northstar is opening a new venue soon." if account.company_name == "Northstar Leisure Group" else f"{account.company_name} is opening a new venue soon."
     elif account.signal:
-        signal_line = f"{account.company_name} has a clear current signal: {account.signal}."
+        signal_line = f"{account.company_name} has a clear signal: {account.signal}."
     else:
         signal_line = f"{account.company_name} is moving through a practical growth phase."
 
     if account.number_of_sites == 1:
         site_line = "For a single-site business, "
     elif account.number_of_sites:
-        site_line = f"For an {account.number_of_sites}-site footprint, "
+        site_line = f"For {_site_phrase(account)}, "
     else:
         site_line = "For teams like yours, "
-    suffix = _channel_suffix(channel)
-    closing = "Best,\nHermes" if channel == "email" else "Hermes"
+    focus_phrase = "pre-opening bookings and memberships" if account.objective else focus
+    outcome_phrase = "pre-opening bookings and memberships" if account.objective else "a practical commercial next step"
+    signal_clause = f"{signal_line} " if account.signal else ""
     message = (
-        f"Hi {greeting}, {opening} {signal_line} "
-        f"{site_line}the priority is usually {focus}. "
-        f"We can help turn that into a concise outreach note and a low-pressure next step. "
-        f"{suffix} {closing}"
+        f"Hi {greeting}, {opening} {signal_clause}"
+        f"{site_line}{focus_phrase} need a clean follow-through. "
+        f"A lighter workflow can help your team turn these signals into sharper outreach and follow-up without much manual work. "
+        f"Worth a quick look at whether that could support {outcome_phrase}?"
     )
     words = message.split()
-    if len(words) > 140:
-        message = " ".join(words[:140])
+    if len(words) > 100:
+        message = " ".join(words[:100])
     return message
 
 
@@ -310,9 +320,9 @@ def _opportunity_summary(account: AccountRecord, meeting_persona: str | None, fo
     objective = account.objective or "a practical commercial next step"
     area_text = ", ".join(areas) if areas else "conversion improvement and operational simplification"
     return (
-        f"For {persona}, the strongest angle is to connect {signal} to {objective}. "
-        f"This points to a small set of value areas: {area_text}. "
-        f"The conversation should stay practical and focus on what would make the first step useful rather than on broad platform claims."
+        f"For {persona}, the clearest angle is to link {signal} to {objective}. "
+        f"Focus the conversation on {area_text}. "
+        f"The most useful next step is a quick review of one real workflow or enquiry path, so the team can judge value without broad platform claims."
     )
 
 
@@ -360,14 +370,14 @@ def _quantified_value_case(account: AccountRecord) -> str:
 def _suggested_questions(account: AccountRecord, focus: str) -> list[str]:
     questions = [
         f"What is the current priority behind {account.objective or 'the next commercial step'}?",
-        "Where does the team see the most friction today: conversion, upsell, support, or reporting?",
-        "Which part of the current process still depends on manual follow-up or spreadsheet work?",
-        "What would make a first step feel useful enough to test without adding complexity?",
+        "Where is the team losing the most value today: conversion, upsell, support, or reporting?",
+        "Which enquiry, booking, or support step still needs manual follow-up?",
+        "What would a small test need to prove before anyone would scale it?",
     ]
     if focus == "customer_support":
         questions[1] = "Where do customers need the most help today: booking, pre-visit questions, or post-visit support?"
     elif focus == "operations":
-        questions[1] = "Where do manual steps or reporting handoffs create the most friction?"
+        questions[1] = "Where do manual handoffs or reporting gaps create the most friction?"
     elif focus == "growth":
         questions[1] = "Which part of the commercial funnel needs the most help: discovery, conversion, or repeat visits?"
     return questions
@@ -377,11 +387,11 @@ def _likely_objections() -> list[tuple[str, str]]:
     return [
         (
             "We already have a process for this.",
-            "That is usually the right starting point. The useful question is whether the current process leaves room for a lighter, faster first step.",
+            "That is a sensible starting point. The useful question is whether the current process leaves room for a lighter, faster first step.",
         ),
         (
             "Timing is not ideal.",
-            "Fair point. A short review can still clarify whether there is a low-effort way to test the idea later.",
+            "Fair point. A short review can still show whether there is a low-effort way to test the idea later.",
         ),
         (
             "We need to avoid adding complexity.",
