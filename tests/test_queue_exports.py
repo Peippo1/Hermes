@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main_module
 from app.main import app
+from app.data_loader import AccountDataNotFoundError
 from app.models import OutreachDraft
 from app.send_queue import SendQueue
 
@@ -48,6 +49,22 @@ class QueueAndExportTests(unittest.TestCase):
         runtime = main_module.RuntimeState.__new__(main_module.RuntimeState)
         with patch("app.main.config", temp_config):
             runtime.__init__()
+        self.assertGreater(len(runtime.accounts), 0)
+        self.assertEqual(runtime.accounts[0].account_id, "ACCT-001")
+
+    def test_google_sheet_csv_url_falls_back_to_sample_file_when_unreachable(self) -> None:
+        temp_config = replace(
+            main_module.config,
+            data_path=Path(""),
+            google_sheet_csv_url="https://docs.google.com/spreadsheets/d/example/export?format=csv&gid=0",
+        )
+        runtime = main_module.RuntimeState.__new__(main_module.RuntimeState)
+        with patch("app.main.config", temp_config), patch(
+            "app.main.load_accounts_from_csv_url",
+            side_effect=AccountDataNotFoundError("Google Sheet unavailable"),
+        ) as mock_load:
+            runtime.__init__()
+        self.assertEqual(mock_load.call_count, 1)
         self.assertGreater(len(runtime.accounts), 0)
         self.assertEqual(runtime.accounts[0].account_id, "ACCT-001")
 
@@ -104,6 +121,33 @@ class QueueAndExportTests(unittest.TestCase):
                 send_queue = json.loads(Path(artifacts["send_queue_path"]).read_text(encoding="utf-8"))
                 self.assertEqual(len(send_queue), 3)
                 self.assertIn("queue_id", send_queue[0])
+
+    def test_export_report_creates_expected_files(self) -> None:
+        self.client.post("/queue/outreach", json={"account_id": "ACCT-001"})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_config = replace(main_module.config, generated_dir=Path(tmpdir))
+            with patch("app.main.config", temp_config):
+                response = self.client.post("/export/report")
+                self.assertEqual(response.status_code, 200)
+
+                payload = response.json()
+                report = payload["report"]
+                self.assertEqual(report["summary_counts"]["outreach_examples"], 3)
+                self.assertEqual(report["summary_counts"]["queued_outreach_items"], 1)
+
+                artifacts = payload["artifacts"]
+                report_md = Path(artifacts["report_md_path"])
+                report_json = Path(artifacts["report_json_path"])
+                self.assertTrue(report_md.exists())
+                self.assertTrue(report_json.exists())
+                self.assertEqual(report_md.name, "outreach_report.md")
+                self.assertEqual(report_json.name, "outreach_report.json")
+
+                saved = json.loads(report_json.read_text(encoding="utf-8"))
+                self.assertEqual(len(saved["generated_outreach_examples"]), 3)
+                self.assertEqual(len(saved["queued_outreach_items"]), 1)
+                self.assertIn("generated_at", saved)
 
 
 if __name__ == "__main__":

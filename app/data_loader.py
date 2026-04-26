@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import csv
+import io
+import logging
 import re
 import zipfile
 from pathlib import Path
 from typing import Any
+from urllib.error import URLError
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from urllib.request import urlopen
 from xml.etree import ElementTree as ET
 
 from pydantic import ValidationError
@@ -14,6 +19,7 @@ from .models import AccountRecord
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_PATH = BASE_DIR / "data" / "sample_accounts.csv"
+LOGGER = logging.getLogger(__name__)
 
 
 class AccountDataError(RuntimeError):
@@ -192,6 +198,67 @@ def _load_csv_records(source: Path) -> list[dict[str, Any]]:
     if not records:
         raise AccountDataMalformedError(f"CSV file '{source}' does not contain any data rows.")
     return records
+
+
+def _load_csv_records_from_text(text: str, source_label: str) -> list[dict[str, Any]]:
+    text = text.lstrip("\ufeff")
+    try:
+        reader = csv.DictReader(io.StringIO(text))
+        if not reader.fieldnames or not any((field or "").strip() for field in reader.fieldnames):
+            raise AccountDataMalformedError(f"CSV source '{source_label}' is missing a header row.")
+
+        records: list[dict[str, Any]] = []
+        for row in reader:
+            if not any(value not in ("", None) for value in row.values()):
+                continue
+            records.append(row)
+    except AccountDataError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise AccountDataMalformedError(f"CSV source '{source_label}' could not be read: {exc}") from exc
+
+    if not records:
+        raise AccountDataMalformedError(f"CSV source '{source_label}' does not contain any data rows.")
+    return records
+
+
+def _google_sheet_csv_url(url: str) -> str:
+    parsed = urlparse(url)
+    if "docs.google.com" not in parsed.netloc or "/spreadsheets/d/" not in parsed.path:
+        return url
+
+    if "/export" in parsed.path and parse_qs(parsed.query).get("format") == ["csv"]:
+        return url
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    try:
+        sheet_index = path_parts.index("d")
+        sheet_id = path_parts[sheet_index + 1]
+    except (ValueError, IndexError) as exc:
+        raise AccountDataMalformedError(f"Google Sheet URL '{url}' is missing a spreadsheet id.") from exc
+
+    query = parse_qs(parsed.query)
+    gid = query.get("gid", ["0"])[0]
+    normalized = parsed._replace(
+        path=f"/spreadsheets/d/{sheet_id}/export",
+        query=urlencode({"format": "csv", "gid": gid}),
+    )
+    return urlunparse(normalized)
+
+
+def load_accounts_from_csv_url(url: str) -> list[AccountRecord]:
+    normalized_url = _google_sheet_csv_url(url)
+    try:
+        with urlopen(normalized_url, timeout=15) as response:
+            charset = response.headers.get_content_charset() or "utf-8"
+            text = response.read().decode(charset, errors="replace")
+    except URLError as exc:
+        raise AccountDataNotFoundError(f"Account data URL '{url}' could not be reached: {exc}") from exc
+    except Exception as exc:  # pragma: no cover - defensive wrapper
+        raise AccountDataMalformedError(f"Account data URL '{url}' could not be read: {exc}") from exc
+
+    records = _load_csv_records_from_text(text, normalized_url)
+    return [normalise_row(row, idx) for idx, row in enumerate(records, start=1)]
 
 
 def _cell_reference_to_index(reference: str) -> int:

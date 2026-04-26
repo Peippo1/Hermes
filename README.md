@@ -38,6 +38,14 @@ python3 -m uvicorn app.main:app --reload
 
 The app fails fast at startup if the data file is missing or malformed.
 
+To load accounts from a published Google Sheet CSV export URL, set:
+
+```bash
+export HERMES_GOOGLE_SHEET_CSV_URL="https://docs.google.com/spreadsheets/d/<sheet-id>/export?format=csv&gid=0"
+```
+
+Hermes also accepts a standard Google Sheets link and normalises it to the CSV export form when possible. If the Google Sheet cannot be reached or read, the backend falls back to `data/sample_accounts.csv` and logs a warning.
+
 Live-agent mode is optional. Deterministic generation remains the default path.
 
 ```bash
@@ -91,6 +99,7 @@ To deploy the backend on Render:
    - `OPENAI_API_KEY` if live-agent mode will be used
    - `HERMES_USE_LIVE_AGENTS=false` by default, or `true` to enable live generation
    - `HERMES_MODEL=gpt-4.1-mini` or another supported model name
+   - `HERMES_GOOGLE_SHEET_CSV_URL` if you want to load accounts from a published Google Sheet CSV export URL
    - `CORS_ORIGINS` with the frontend origin, such as the local Vite URL and the eventual Vercel URL
    - `HERMES_DATA_PATH` only if you want to override the bundled sample export
 6. Set the health check path to `/health`.
@@ -171,6 +180,12 @@ curl -X POST http://127.0.0.1:8000/queue/outreach \
 curl -X POST http://127.0.0.1:8000/export/examples
 ```
 
+8. Export a report.
+
+```bash
+curl -X POST http://127.0.0.1:8000/export/report
+```
+
 ## What Outputs Are Generated
 
 - `GET /accounts` returns the normalised account records.
@@ -179,6 +194,7 @@ curl -X POST http://127.0.0.1:8000/export/examples
 - `POST /queue/outreach` adds a local queue item with follow-up timestamps and guardrail flags.
 - `GET /queue` returns the current queue contents and queue size.
 - `POST /export/examples` writes `outputs/outreach_examples.csv`, `outputs/outreach_examples.json`, `outputs/briefing_note_1.md`, `outputs/briefing_note_2.md`, and `outputs/send_queue.json`.
+- `POST /export/report` writes `outputs/outreach_report.md` and `outputs/outreach_report.json`.
 
 The export bundle contains 3 outreach examples, 2 briefing notes, and 3 queued outreach items.
 
@@ -213,6 +229,7 @@ The export bundle contains 3 outreach examples, 2 briefing notes, and 3 queued o
 - `POST /queue/outreach`
 - `GET /queue`
 - `POST /export/examples`
+- `POST /export/report`
 
 ## Notes
 

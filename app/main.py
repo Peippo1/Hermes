@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
@@ -7,14 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .agents import agent_mode
 from .config import get_config
-from .data_loader import AccountDataError, load_accounts_from_path
-from .exporters import export_briefing_markdown, export_outreach_csv, export_outreach_json, export_queue_json
+from .data_loader import AccountDataError, load_accounts_from_csv_url, load_accounts_from_path
+from .exporters import (
+    export_briefing_markdown,
+    export_outreach_csv,
+    export_outreach_json,
+    export_queue_json,
+    export_report_json,
+    export_report_markdown,
+)
 from .models import AccountRecord, AccountsResponse, BriefingNote, BriefingRequest, OutreachDraft, OutreachRequest, QueueOutreachRequest, QueueResponse
 from .send_queue import SendQueue
 from .workflows import generate_briefing, generate_outreach, queue_outreach
 
 
 config = get_config()
+LOGGER = logging.getLogger(__name__)
 app = FastAPI(title=config.app_name, version="0.2.0")
 
 default_cors_origins = [
@@ -39,7 +49,7 @@ app.add_middleware(
 
 class RuntimeState:
     def __init__(self) -> None:
-        self.accounts = load_accounts_from_path(self._resolve_data_path())
+        self.accounts = self._load_accounts()
         self.queue = SendQueue()
 
     def get_account(self, account_id: str) -> AccountRecord | None:
@@ -47,6 +57,18 @@ class RuntimeState:
             if account.account_id == account_id:
                 return account
         return None
+
+    def _load_accounts(self) -> list[AccountRecord]:
+        if config.google_sheet_csv_url:
+            try:
+                return load_accounts_from_csv_url(config.google_sheet_csv_url)
+            except AccountDataError as exc:
+                LOGGER.warning(
+                    "Failed to load accounts from HERMES_GOOGLE_SHEET_CSV_URL; falling back to local sample data: %s",
+                    exc,
+                )
+
+        return load_accounts_from_path(self._resolve_data_path())
 
     def _resolve_data_path(self) -> Path:
         base_dir = Path(__file__).resolve().parent.parent
@@ -58,7 +80,7 @@ class RuntimeState:
             if candidate.is_file():
                 return candidate
         candidate_text = ", ".join(str(candidate) for candidate in candidates if candidate is not None)
-        raise RuntimeError(f"No valid account data file found. Checked: {candidate_text}")
+        raise RuntimeError(f"No valid CSV/XLSX account data file found. Checked: {candidate_text}")
 
 
 try:
@@ -187,5 +209,44 @@ def export_examples() -> dict[str, object]:
             "briefing_note_1_path": str(briefing_note_1_path),
             "briefing_note_2_path": str(briefing_note_2_path),
             "send_queue_path": str(send_queue_path),
+        },
+    }
+
+
+@app.post("/export/report")
+def export_report() -> dict[str, object]:
+    selected_accounts = app.state.runtime.accounts[:3]
+    outreach_items = [
+        generate_outreach(
+            app.state.runtime.accounts,
+            OutreachRequest(account_id=account.account_id),
+            use_live_agents=False,
+        )
+        for account in selected_accounts
+    ]
+    queued_items = app.state.runtime.queue.list_items()
+    guardrail_flags = [
+        *[flag for item in outreach_items for flag in item.guardrail_flags],
+        *[flag for item in queued_items for flag in item.guardrail_flags],
+    ]
+    report = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "summary_counts": {
+            "outreach_examples": len(outreach_items),
+            "queued_outreach_items": len(queued_items),
+            "guardrail_flags": len(guardrail_flags),
+        },
+        "generated_outreach_examples": [item.model_dump() for item in outreach_items],
+        "queued_outreach_items": [item.model_dump(mode="json") for item in queued_items],
+        "guardrail_flags": guardrail_flags,
+    }
+    generated_dir = Path(config.generated_dir)
+    report_md_path = export_report_markdown(report, generated_dir / "outreach_report.md")
+    report_json_path = export_report_json(report, generated_dir / "outreach_report.json")
+    return {
+        "report": report,
+        "artifacts": {
+            "report_md_path": str(report_md_path),
+            "report_json_path": str(report_json_path),
         },
     }

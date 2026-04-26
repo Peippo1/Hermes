@@ -41,3 +41,56 @@ def export_queue_json(items: Iterable[QueueItem], path: str | Path) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps([item.model_dump(mode="json") for item in items], indent=2, default=str), encoding="utf-8")
     return target
+
+
+def export_report_json(report: dict[str, object], path: str | Path) -> Path:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+    return target
+
+
+def export_report_markdown(report: dict[str, object], path: str | Path) -> Path:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    summary = report.get("summary_counts", {})
+    outreach_examples = report.get("generated_outreach_examples", [])
+    queued_items = report.get("queued_outreach_items", [])
+    guardrail_flags = report.get("guardrail_flags", [])
+    timestamp = report.get("generated_at", "Unknown")
+
+    lines: list[str] = [
+        "# Hermes Report",
+        "",
+        f"Generated at: {timestamp}",
+        "",
+        "## Summary Counts",
+        f"- Outreach examples: {summary.get('outreach_examples', 0)}",
+        f"- Queued outreach items: {summary.get('queued_outreach_items', 0)}",
+        f"- Guardrail flags: {summary.get('guardrail_flags', 0)}",
+        "",
+        "## Generated Outreach Examples",
+    ]
+
+    for item in outreach_examples:
+        lines.extend(
+            [
+                f"- {item.get('company_name', 'Unknown company')}: {item.get('message', '')}",
+            ]
+        )
+
+    lines.extend(["", "## Queued Outreach Items"])
+    for item in queued_items:
+        lines.append(f"- {item.get('company_name', 'Unknown company')} ({item.get('status', 'unknown')})")
+
+    lines.extend(["", "## Guardrail Flags"])
+    if guardrail_flags:
+        for flag in guardrail_flags:
+            lines.append(f"- {flag}")
+    else:
+        lines.append("- None")
+
+    lines.append("")
+    target.write_text("\n".join(lines), encoding="utf-8")
+    return target

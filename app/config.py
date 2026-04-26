@@ -23,9 +23,17 @@ def _env_path(name: str) -> Path | None:
     return Path(raw_value.strip())
 
 
+def _env_text(name: str) -> str | None:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return None
+    return raw_value.strip()
+
+
 @dataclass(frozen=True)
 class AppConfig:
     data_path: Path | None = _env_path("HERMES_DATA_PATH")
+    google_sheet_csv_url: str | None = _env_text("HERMES_GOOGLE_SHEET_CSV_URL")
     generated_dir: Path = OUTPUT_DIR
     prompts_dir: Path = PROMPTS_DIR
     use_live_agents: bool = os.getenv("HERMES_USE_LIVE_AGENTS", "false").lower() in {"1", "true", "yes"}
