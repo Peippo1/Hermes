@@ -9,18 +9,34 @@ import {
   getMockAccounts
 } from './mockData';
 import {
+  ApiError,
   exportExamples,
   fetchAccounts,
   fetchQueue,
   generateBriefing,
   generateOutreach,
+  getApiBaseUrl,
   hasApiBaseUrl,
   queueOutreach
 } from './api';
-import type { AccountRecord, BriefingNote, ExportArtifacts, OutreachDraft, QueueItem, QueueResponse, Tone } from './types';
+import type {
+  AccountRecord,
+  BriefingNote,
+  ExportArtifacts,
+  OutreachDraft,
+  QueueItem,
+  Tone
+} from './types';
 
 type Mode = 'api' | 'mock';
-type Status = 'idle' | 'loading' | 'ready' | 'error';
+type ConnectionState = 'loading' | 'connected' | 'mock' | 'backend-unavailable' | 'request-failed';
+type ActionLoadingState = {
+  outreach: boolean;
+  briefing: boolean;
+  queue: boolean;
+  export: boolean;
+  queueView: boolean;
+};
 
 function formatNumber(value?: number | null): string {
   if (value === null || value === undefined) return 'Not provided';
@@ -40,10 +56,31 @@ function joinList(values: string[] | undefined): string {
   return values && values.length > 0 ? values.join(' • ') : 'None';
 }
 
+function initialLoadingState(): ActionLoadingState {
+  return {
+    outreach: false,
+    briefing: false,
+    queue: false,
+    export: false,
+    queueView: false
+  };
+}
+
+function fallbackMessage(kind: 'backend-unavailable' | 'request-failed'): string {
+  return kind === 'backend-unavailable'
+    ? 'Backend unavailable. Using mock mode.'
+    : 'Request failed. Using mock mode.';
+}
+
+function actionLabel(label: string, loading: boolean): string {
+  return loading ? `${label}...` : label;
+}
+
 export default function App() {
   const [mode, setMode] = useState<Mode>('mock');
-  const [status, setStatus] = useState<Status>('idle');
+  const [connectionState, setConnectionState] = useState<ConnectionState>('loading');
   const [statusMessage, setStatusMessage] = useState<string>('Loading account data.');
+  const [actionError, setActionError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [outreach, setOutreach] = useState<OutreachDraft | null>(null);
@@ -51,48 +88,64 @@ export default function App() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueSize, setQueueSize] = useState<number>(0);
   const [artifacts, setArtifacts] = useState<ExportArtifacts | null>(null);
+  const [loading, setLoading] = useState<ActionLoadingState>(initialLoadingState);
 
   const selectedAccount = useMemo(
     () => accounts.find((account) => account.account_id === selectedAccountId) ?? null,
     [accounts, selectedAccountId]
   );
+  const connectionAlert =
+    connectionState === 'backend-unavailable' || connectionState === 'request-failed' ? statusMessage : null;
+
+  const apiBaseUrl = hasApiBaseUrl() ? getApiBaseUrl() : 'Not configured';
+
+  function setLoadingFlag(key: keyof ActionLoadingState, value: boolean) {
+    setLoading((current) => ({ ...current, [key]: value }));
+  }
+
+  function switchToMock(
+    kind: 'mock' | 'backend-unavailable' | 'request-failed',
+    accountsForMock: AccountRecord[]
+  ) {
+    const mockQueue = buildMockQueue(accountsForMock);
+    setMode('mock');
+    setConnectionState(kind);
+    setStatusMessage(kind === 'mock' ? 'Mock mode is active. No API base URL is configured.' : fallbackMessage(kind));
+    setAccounts(accountsForMock);
+    setSelectedAccountId(accountsForMock[0]?.account_id ?? '');
+    setQueue(mockQueue.items);
+    setQueueSize(mockQueue.queue_size);
+  }
 
   useEffect(() => {
     let cancelled = false;
+
     async function loadAccounts() {
       if (!hasApiBaseUrl()) {
-        const mockAccounts = getMockAccounts();
-        const mockQueue = buildMockQueue(mockAccounts);
         if (cancelled) return;
-        setMode('mock');
-        setStatus('ready');
-        setStatusMessage('Demo mock mode is active.');
-        setAccounts(mockAccounts);
-        setSelectedAccountId(mockAccounts[0]?.account_id ?? '');
-        setQueue(mockQueue.items);
-        setQueueSize(mockQueue.queue_size);
+        const mockAccounts = getMockAccounts();
+        switchToMock('mock', mockAccounts);
         return;
       }
-      setStatus('loading');
+
+      setConnectionState('loading');
+      setStatusMessage('Connecting to the backend.');
+
       try {
-        const remoteAccounts = await fetchAccounts();
+        const [remoteAccounts, remoteQueue] = await Promise.all([fetchAccounts(), fetchQueue()]);
         if (cancelled) return;
         setMode('api');
-        setStatus('ready');
+        setConnectionState('connected');
         setStatusMessage('Connected to the backend.');
         setAccounts(remoteAccounts);
         setSelectedAccountId(remoteAccounts[0]?.account_id ?? '');
-      } catch {
+        setQueue(remoteQueue.items);
+        setQueueSize(remoteQueue.queue_size);
+      } catch (error) {
         if (cancelled) return;
         const mockAccounts = getMockAccounts();
-      setMode('mock');
-      setStatus('ready');
-      setStatusMessage('Demo mock mode is active.');
-      setAccounts(mockAccounts);
-      setSelectedAccountId(mockAccounts[0]?.account_id ?? '');
-      const mockQueue = buildMockQueue(mockAccounts);
-      setQueue(mockQueue.items);
-      setQueueSize(mockQueue.queue_size);
+        const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
+        switchToMock(kind, mockAccounts);
       }
     }
 
@@ -104,104 +157,129 @@ export default function App() {
 
   async function handleGenerateOutreach() {
     if (!selectedAccount) return;
-    if (mode === 'mock') {
-      setOutreach(generateMockOutreach(selectedAccount));
-      return;
-    }
+    setActionError(null);
+    setLoadingFlag('outreach', true);
     try {
+      if (mode === 'mock') {
+        setOutreach(generateMockOutreach(selectedAccount));
+        return;
+      }
       setOutreach(await generateOutreach({ account_id: selectedAccount.account_id }));
-    } catch {
-      setMode('mock');
-      setStatusMessage('Demo mock mode is active.');
+    } catch (error) {
+      const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
+      setActionError(fallbackMessage(kind));
+      switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
       setOutreach(generateMockOutreach(selectedAccount));
+    } finally {
+      setLoadingFlag('outreach', false);
     }
   }
 
   async function handleGenerateBriefing() {
     if (!selectedAccount) return;
-    if (mode === 'mock') {
-      setBriefing(generateMockBriefing(selectedAccount));
-      return;
-    }
+    setActionError(null);
+    setLoadingFlag('briefing', true);
     try {
+      if (mode === 'mock') {
+        setBriefing(generateMockBriefing(selectedAccount));
+        return;
+      }
       setBriefing(await generateBriefing({ account_id: selectedAccount.account_id }));
-    } catch {
-      setMode('mock');
-      setStatusMessage('Demo mock mode is active.');
+    } catch (error) {
+      const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
+      setActionError(fallbackMessage(kind));
+      switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
       setBriefing(generateMockBriefing(selectedAccount));
+    } finally {
+      setLoadingFlag('briefing', false);
     }
   }
 
   async function handleQueueOutreach() {
     if (!selectedAccount) return;
-    if (mode === 'mock') {
-      const item = enqueueMockOutreach(selectedAccount);
-      setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
-      setQueueSize((current) => current + 1);
-      if (!outreach) setOutreach(generateMockOutreach(selectedAccount));
-      return;
-    }
+    setActionError(null);
+    setLoadingFlag('queue', true);
     try {
+      if (mode === 'mock') {
+        const item = enqueueMockOutreach(selectedAccount);
+        setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
+        setQueueSize((current) => current + 1);
+        if (!outreach) setOutreach(generateMockOutreach(selectedAccount));
+        return;
+      }
       const response = await queueOutreach({ account_id: selectedAccount.account_id });
       setQueue((current) => [response.item, ...current.filter((entry) => entry.queue_id !== response.item.queue_id)]);
       setQueueSize(response.queue_size);
       if (!outreach) {
         setOutreach(await generateOutreach({ account_id: selectedAccount.account_id }));
       }
-    } catch {
-      setMode('mock');
-      setStatusMessage('Demo mock mode is active.');
+    } catch (error) {
+      const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
+      setActionError(fallbackMessage(kind));
+      switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
       const item = enqueueMockOutreach(selectedAccount);
-      setQueue((current) => [item, ...current]);
+      setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
       setQueueSize((current) => current + 1);
       if (!outreach) setOutreach(generateMockOutreach(selectedAccount));
+    } finally {
+      setLoadingFlag('queue', false);
     }
   }
 
   async function handleViewQueue() {
-    if (mode === 'mock') {
-      const response = buildMockQueue(accounts);
-      setQueue(response.items);
-      setQueueSize(response.queue_size);
-      return;
-    }
+    setActionError(null);
+    setLoadingFlag('queueView', true);
     try {
+      if (mode === 'mock') {
+        const response = buildMockQueue(accounts);
+        setQueue(response.items);
+        setQueueSize(response.queue_size);
+        return;
+      }
       const response = await fetchQueue();
       setQueue(response.items);
       setQueueSize(response.queue_size);
-    } catch {
-      setMode('mock');
-      setStatusMessage('Demo mock mode is active.');
-      const response = buildMockQueue(accounts);
+    } catch (error) {
+      const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
+      setActionError(fallbackMessage(kind));
+      switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
+      const response = buildMockQueue(accounts.length > 0 ? accounts : getMockAccounts());
       setQueue(response.items);
       setQueueSize(response.queue_size);
+    } finally {
+      setLoadingFlag('queueView', false);
     }
   }
 
   async function handleExportExamples() {
-    if (mode === 'mock') {
-      if (!selectedAccount) return;
-      const exportBundle = buildMockExport(selectedAccount);
-      setOutreach(exportBundle.outreach);
-      setBriefing(exportBundle.briefing);
-      setQueue((current) => [exportBundle.queueItem, ...current]);
-      setArtifacts(buildMockArtifacts());
-      return;
-    }
+    setActionError(null);
+    setLoadingFlag('export', true);
     try {
+      if (mode === 'mock') {
+        if (!selectedAccount) return;
+        const exportBundle = buildMockExport(selectedAccount);
+        setOutreach(exportBundle.outreach);
+        setBriefing(exportBundle.briefing);
+        setQueue((current) => [exportBundle.queueItem, ...current.filter((entry) => entry.account_id !== exportBundle.queueItem.account_id)]);
+        setArtifacts(buildMockArtifacts());
+        return;
+      }
       const response = await exportExamples();
       setOutreach(response.outreach[0] ?? null);
       setBriefing(response.briefings[0] ?? null);
       setArtifacts(response.artifacts);
-    } catch {
-      setMode('mock');
-      setStatusMessage('Demo mock mode is active.');
+    } catch (error) {
+      const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
+      setActionError(fallbackMessage(kind));
+      switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
       if (!selectedAccount) return;
       const exportBundle = buildMockExport(selectedAccount);
       setOutreach(exportBundle.outreach);
       setBriefing(exportBundle.briefing);
-      setQueue((current) => [exportBundle.queueItem, ...current]);
+      setQueue((current) => [exportBundle.queueItem, ...current.filter((entry) => entry.account_id !== exportBundle.queueItem.account_id)]);
       setArtifacts(buildMockArtifacts());
+    } finally {
+      setLoadingFlag('export', false);
     }
   }
 
@@ -214,7 +292,7 @@ export default function App() {
               <span className={`badge ${mode === 'mock' ? 'badge-warning' : 'badge-success'}`}>
                 {mode === 'mock' ? 'Demo mock mode' : 'Connected mode'}
               </span>
-              <span className="status-chip">{status === 'loading' ? 'Loading' : statusMessage}</span>
+              <span className="status-chip">{connectionState === 'loading' ? 'Loading' : statusMessage}</span>
             </div>
             <h1>Hermes — AI Sales Enablement Workflow Prototype</h1>
             <p className="subheading">
@@ -229,26 +307,57 @@ export default function App() {
         </header>
 
         <section className="control-bar card">
-          <div className="field">
-            <label htmlFor="account">Account selector</label>
-            <select
-              id="account"
-              value={selectedAccountId}
-              onChange={(event) => setSelectedAccountId(event.target.value)}
-            >
-              {accounts.map((account) => (
-                <option key={account.account_id} value={account.account_id}>
-                  {account.company_name}
-                </option>
-              ))}
-            </select>
+          <div className="control-grid">
+            <div className="field">
+              <label htmlFor="account">Account selector</label>
+              <select
+                id="account"
+                value={selectedAccountId}
+                onChange={(event) => setSelectedAccountId(event.target.value)}
+              >
+                {accounts.map((account) => (
+                  <option key={account.account_id} value={account.account_id}>
+                    {account.company_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="status-panel">
+              <div>
+                <span className="label">API base URL</span>
+                <p>{apiBaseUrl}</p>
+              </div>
+              <div>
+                <span className="label">Mode</span>
+                <p>{mode === 'api' ? 'Real API mode' : 'Mock fallback mode'}</p>
+              </div>
+              <div>
+                <span className="label">Queue</span>
+                <p>{queueSize} items</p>
+              </div>
+              <div className="status-note">Mock queue only — no external sending.</div>
+            </div>
           </div>
+
+          {connectionAlert ? <div className="error-banner">{connectionAlert}</div> : null}
+          {actionError ? <div className="error-banner">{actionError}</div> : null}
+
           <div className="button-row">
-            <button type="button" onClick={handleGenerateOutreach}>Generate Outreach</button>
-            <button type="button" onClick={handleGenerateBriefing}>Generate Briefing</button>
-            <button type="button" onClick={handleQueueOutreach}>Add to Mock Queue</button>
-            <button type="button" onClick={handleViewQueue}>View Queue</button>
-            <button type="button" onClick={handleExportExamples}>Export Examples</button>
+            <button type="button" onClick={handleGenerateOutreach} disabled={loading.outreach}>
+              {actionLabel('Generate Outreach', loading.outreach)}
+            </button>
+            <button type="button" onClick={handleGenerateBriefing} disabled={loading.briefing}>
+              {actionLabel('Generate Briefing', loading.briefing)}
+            </button>
+            <button type="button" onClick={handleQueueOutreach} disabled={loading.queue}>
+              {actionLabel('Add to Mock Queue', loading.queue)}
+            </button>
+            <button type="button" onClick={handleViewQueue} disabled={loading.queueView}>
+              {actionLabel('View Queue', loading.queueView)}
+            </button>
+            <button type="button" onClick={handleExportExamples} disabled={loading.export}>
+              {actionLabel('Export Examples', loading.export)}
+            </button>
           </div>
         </section>
 
@@ -348,7 +457,9 @@ export default function App() {
                 </div>
                 <div className="flag-list">
                   {outreach.guardrail_flags.map((flag) => (
-                    <span key={flag} className="flag">{flag}</span>
+                    <span key={flag} className="flag">
+                      {flag}
+                    </span>
                   ))}
                 </div>
               </>
@@ -374,7 +485,9 @@ export default function App() {
                 </div>
                 <div className="flag-list">
                   {briefing.guardrail_flags.map((flag) => (
-                    <span key={flag} className="flag">{flag}</span>
+                    <span key={flag} className="flag">
+                      {flag}
+                    </span>
                   ))}
                 </div>
               </>
@@ -437,11 +550,21 @@ export default function App() {
             </div>
             {artifacts ? (
               <ul className="artifact-list">
-                <li><code>{artifacts.outreach_csv_path}</code></li>
-                <li><code>{artifacts.outreach_json_path}</code></li>
-                <li><code>{artifacts.briefing_note_1_path}</code></li>
-                <li><code>{artifacts.briefing_note_2_path}</code></li>
-                <li><code>{artifacts.send_queue_path}</code></li>
+                <li>
+                  <code>{artifacts.outreach_csv_path}</code>
+                </li>
+                <li>
+                  <code>{artifacts.outreach_json_path}</code>
+                </li>
+                <li>
+                  <code>{artifacts.briefing_note_1_path}</code>
+                </li>
+                <li>
+                  <code>{artifacts.briefing_note_2_path}</code>
+                </li>
+                <li>
+                  <code>{artifacts.send_queue_path}</code>
+                </li>
               </ul>
             ) : (
               <p className="empty-state">Export examples to display artifact paths.</p>

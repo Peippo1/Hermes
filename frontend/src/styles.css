@@ -150,6 +150,13 @@ select {
   margin-bottom: 22px;
 }
 
+.control-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -174,6 +181,30 @@ select {
   gap: 12px;
 }
 
+.status-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(15, 95, 90, 0.08);
+}
+
+.status-panel p {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.status-note {
+  grid-column: span 2;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(18, 18, 18, 0.06);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
 button {
   border: 0;
   border-radius: 14px;
@@ -188,6 +219,20 @@ button {
 button:hover {
   transform: translateY(-1px);
   background: #0d0d0d;
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+  transform: none;
+}
+
+.error-banner {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(169, 54, 31, 0.1);
+  color: #7c2414;
+  font-weight: 600;
 }
 
 .grid {
@@ -368,6 +413,10 @@ code {
   .output-card {
     grid-column: span 12;
   }
+
+  .control-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -391,5 +440,12 @@ code {
   .field select {
     width: 100%;
   }
-}
 
+  .status-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .status-note {
+    grid-column: span 1;
+  }
+}
