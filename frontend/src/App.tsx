@@ -11,6 +11,7 @@ import {
 import {
   ApiError,
   exportExamples,
+  fetchDataSource,
   fetchAccounts,
   fetchQueue,
   generateBriefing,
@@ -22,6 +23,7 @@ import {
 import type {
   AccountRecord,
   BriefingNote,
+  DataSourceInfo,
   ExportArtifacts,
   OutreachDraft,
   QueueItem,
@@ -164,6 +166,7 @@ export default function App() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueSize, setQueueSize] = useState<number>(0);
   const [artifacts, setArtifacts] = useState<ExportArtifacts | null>(null);
+  const [dataSourceInfo, setDataSourceInfo] = useState<DataSourceInfo | null>(null);
   const [loading, setLoading] = useState<ActionLoadingState>(initialLoadingState);
 
   const selectedAccount = useMemo(
@@ -192,6 +195,12 @@ export default function App() {
     setSelectedAccountId(accountsForMock[0]?.account_id ?? '');
     setQueue(mockQueue.items);
     setQueueSize(mockQueue.queue_size);
+    setDataSourceInfo({
+      data_source: 'sample_fallback',
+      data_source_detail: 'data/sample_accounts.csv',
+      data_load_warning: kind === 'mock' ? null : fallbackMessage(kind),
+      loaded_accounts: accountsForMock.length
+    });
   }
 
   useEffect(() => {
@@ -209,7 +218,11 @@ export default function App() {
       setStatusMessage('Connecting to the backend.');
 
       try {
-        const [remoteAccounts, remoteQueue] = await Promise.all([fetchAccounts(), fetchQueue()]);
+        const [remoteAccounts, remoteQueue, remoteDataSource] = await Promise.all([
+          fetchAccounts(),
+          fetchQueue(),
+          fetchDataSource()
+        ]);
         if (cancelled) return;
         setMode('api');
         setConnectionState('connected');
@@ -218,6 +231,7 @@ export default function App() {
         setSelectedAccountId(remoteAccounts[0]?.account_id ?? '');
         setQueue(remoteQueue.items);
         setQueueSize(remoteQueue.queue_size);
+        setDataSourceInfo(remoteDataSource);
       } catch (error) {
         if (cancelled) return;
         const mockAccounts = getMockAccounts();
@@ -416,6 +430,21 @@ export default function App() {
                 <span className="label">Queue</span>
                 <p>{queueSize} items</p>
               </div>
+              <div>
+                <span className="label">Data source</span>
+                <p>
+                  {dataSourceInfo
+                    ? `${dataSourceInfo.data_source === 'google_sheet'
+                      ? 'Google Sheet'
+                      : dataSourceInfo.data_source === 'local_file'
+                        ? 'Local file'
+                        : 'Sample fallback'} · ${dataSourceInfo.data_source_detail}`
+                    : 'Loading...'}
+                </p>
+              </div>
+              {dataSourceInfo?.data_load_warning ? (
+                <div className="status-note">{dataSourceInfo.data_load_warning}</div>
+              ) : null}
               <div className="status-note">Mock queue only — no external messages are sent.</div>
             </div>
           </div>

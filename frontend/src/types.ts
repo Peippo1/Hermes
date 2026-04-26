@@ -91,6 +91,13 @@ export interface QueueResponse {
   queue_size: number;
 }
 
+export interface DataSourceInfo {
+  data_source: 'google_sheet' | 'local_file' | 'sample_fallback';
+  data_source_detail: string;
+  data_load_warning?: string | null;
+  loaded_accounts: number;
+}
+
 export interface ExportArtifacts {
   outreach_csv_path: string;
   outreach_json_path: string;
@@ -109,4 +116,3 @@ export interface ExportExamplesResponse {
   briefings: BriefingNote[];
   artifacts: ExportArtifacts;
 }
-

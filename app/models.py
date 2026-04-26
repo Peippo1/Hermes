@@ -101,6 +101,13 @@ class QueueResponse(BaseModel):
     queue_size: int
 
 
+class DataSourceInfo(BaseModel):
+    data_source: Literal["google_sheet", "local_file", "sample_fallback"]
+    data_source_detail: str
+    data_load_warning: str | None = None
+    loaded_accounts: int
+
+
 class ExportArtifacts(BaseModel):
     outreach_csv_path: str
     outreach_json_path: str

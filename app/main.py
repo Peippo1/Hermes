@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .agents import agent_mode
 from .config import get_config
-from .data_loader import AccountDataError, load_accounts_from_csv_url, load_accounts_from_path
+from .data_loader import AccountDataError, load_accounts_with_metadata
 from .exporters import (
     export_briefing_markdown,
     export_outreach_csv,
@@ -18,7 +18,7 @@ from .exporters import (
     export_report_json,
     export_report_markdown,
 )
-from .models import AccountRecord, AccountsResponse, BriefingNote, BriefingRequest, OutreachDraft, OutreachRequest, QueueOutreachRequest, QueueResponse
+from .models import AccountRecord, AccountsResponse, BriefingNote, BriefingRequest, DataSourceInfo, OutreachDraft, OutreachRequest, QueueOutreachRequest, QueueResponse
 from .send_queue import SendQueue
 from .workflows import generate_briefing, generate_outreach, queue_outreach
 
@@ -49,7 +49,11 @@ app.add_middleware(
 
 class RuntimeState:
     def __init__(self) -> None:
-        self.accounts = self._load_accounts()
+        load_result = self._load_accounts()
+        self.accounts = load_result.accounts
+        self.data_source = load_result.data_source
+        self.data_source_detail = load_result.data_source_detail
+        self.data_load_warning = load_result.data_load_warning
         self.queue = SendQueue()
 
     def get_account(self, account_id: str) -> AccountRecord | None:
@@ -58,29 +62,11 @@ class RuntimeState:
                 return account
         return None
 
-    def _load_accounts(self) -> list[AccountRecord]:
-        if config.google_sheet_csv_url:
-            try:
-                return load_accounts_from_csv_url(config.google_sheet_csv_url)
-            except AccountDataError as exc:
-                LOGGER.warning(
-                    "Failed to load accounts from HERMES_GOOGLE_SHEET_CSV_URL; falling back to local sample data: %s",
-                    exc,
-                )
-
-        return load_accounts_from_path(self._resolve_data_path())
-
-    def _resolve_data_path(self) -> Path:
-        base_dir = Path(__file__).resolve().parent.parent
-        sample_path = base_dir / "data" / "sample_accounts.csv"
-        fallback_candidates = [sample_path, base_dir / "outputs" / "sample_accounts.csv"]
-        candidates = [config.data_path] if config.data_path is not None else []
-        candidates.extend(fallback_candidates)
-        for candidate in candidates:
-            if candidate.is_file():
-                return candidate
-        candidate_text = ", ".join(str(candidate) for candidate in candidates if candidate is not None)
-        raise RuntimeError(f"No valid CSV/XLSX account data file found. Checked: {candidate_text}")
+    def _load_accounts(self):
+        return load_accounts_with_metadata(
+            data_path=config.data_path,
+            google_sheet_csv_url=config.google_sheet_csv_url,
+        )
 
 
 try:
@@ -96,10 +82,23 @@ def health() -> dict[str, object]:
         "status": "ok",
         "app": config.app_name,
         "loaded_accounts": len(app.state.runtime.accounts),
+        "data_source": app.state.runtime.data_source,
+        "data_source_detail": app.state.runtime.data_source_detail,
+        "data_load_warning": app.state.runtime.data_load_warning,
         "queue_items": len(app.state.runtime.queue.items),
         "live_agents_enabled": mode.live,
         "agent_key_present": mode.enabled,
     }
+
+
+@app.get("/data-source", response_model=DataSourceInfo)
+def data_source() -> DataSourceInfo:
+    return DataSourceInfo(
+        data_source=app.state.runtime.data_source,
+        data_source_detail=app.state.runtime.data_source_detail,
+        data_load_warning=app.state.runtime.data_load_warning,
+        loaded_accounts=len(app.state.runtime.accounts),
+    )
 
 
 @app.get("/accounts", response_model=AccountsResponse)

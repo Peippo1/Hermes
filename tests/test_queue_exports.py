@@ -44,6 +44,21 @@ class QueueAndExportTests(unittest.TestCase):
         self.assertEqual(queue_payload["queue_size"], len(queue_payload["items"]))
         self.assertEqual(queue_payload["items"][0]["status"], "pending_review")
 
+    def test_health_and_data_source_report_sample_fallback(self) -> None:
+        health_response = self.client.get("/health")
+        self.assertEqual(health_response.status_code, 200)
+        health_payload = health_response.json()
+        self.assertEqual(health_payload["data_source"], "local_file")
+        self.assertEqual(health_payload["data_source_detail"], str(self.main_module.config.data_path))
+        self.assertIsNone(health_payload["data_load_warning"])
+        self.assertEqual(health_payload["loaded_accounts"], 3)
+
+        data_source_response = self.client.get("/data-source")
+        self.assertEqual(data_source_response.status_code, 200)
+        data_source_payload = data_source_response.json()
+        self.assertEqual(data_source_payload["data_source"], "local_file")
+        self.assertEqual(data_source_payload["loaded_accounts"], 3)
+
     def test_empty_data_path_falls_back_to_sample_file(self) -> None:
         temp_config = replace(self.main_module.config, data_path=Path(""))
         runtime = self.main_module.RuntimeState.__new__(self.main_module.RuntimeState)
@@ -51,6 +66,8 @@ class QueueAndExportTests(unittest.TestCase):
             runtime.__init__()
         self.assertGreater(len(runtime.accounts), 0)
         self.assertEqual(runtime.accounts[0].account_id, "ACCT-001")
+        self.assertEqual(runtime.data_source, "sample_fallback")
+        self.assertEqual(runtime.data_source_detail, "data/sample_accounts.csv")
 
     def test_google_sheet_csv_url_falls_back_to_sample_file_when_unreachable(self) -> None:
         temp_config = replace(
@@ -60,13 +77,15 @@ class QueueAndExportTests(unittest.TestCase):
         )
         runtime = self.main_module.RuntimeState.__new__(self.main_module.RuntimeState)
         with patch("app.main.config", temp_config), patch(
-            "app.main.load_accounts_from_csv_url",
+            "app.data_loader.load_accounts_from_csv_url",
             side_effect=AccountDataNotFoundError("Google Sheet unavailable"),
         ) as mock_load:
             runtime.__init__()
         self.assertEqual(mock_load.call_count, 1)
         self.assertGreater(len(runtime.accounts), 0)
         self.assertEqual(runtime.accounts[0].account_id, "ACCT-001")
+        self.assertEqual(runtime.data_source, "sample_fallback")
+        self.assertEqual(runtime.data_source_detail, "data/sample_accounts.csv")
 
     def test_queue_outreach_does_not_send_externally(self) -> None:
         draft = OutreachDraft(

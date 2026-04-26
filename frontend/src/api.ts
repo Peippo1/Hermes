@@ -2,6 +2,7 @@ import type {
   AccountRecord,
   BriefingNote,
   BriefingRequest,
+  DataSourceInfo,
   ExportExamplesResponse,
   ExportArtifacts,
   OutreachDraft,
@@ -87,6 +88,10 @@ export async function queueOutreach(request: QueueOutreachRequest): Promise<{ it
 
 export async function fetchQueue(): Promise<QueueResponse> {
   return requestJson<QueueResponse>('/queue');
+}
+
+export async function fetchDataSource(): Promise<DataSourceInfo> {
+  return requestJson<DataSourceInfo>('/data-source');
 }
 
 export async function exportExamples(): Promise<ExportExamplesResponse & { artifacts: ExportArtifacts }> {

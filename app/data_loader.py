@@ -5,8 +5,9 @@ import io
 import logging
 import re
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.error import URLError
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from urllib.request import urlopen
@@ -19,7 +20,10 @@ from .models import AccountRecord
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_PATH = BASE_DIR / "data" / "sample_accounts.csv"
+DEFAULT_DATA_PATH_LABEL = "data/sample_accounts.csv"
 LOGGER = logging.getLogger(__name__)
+
+DataSourceName = Literal["google_sheet", "local_file", "sample_fallback"]
 
 
 class AccountDataError(RuntimeError):
@@ -32,6 +36,14 @@ class AccountDataNotFoundError(AccountDataError):
 
 class AccountDataMalformedError(AccountDataError):
     """Raised when the account data file cannot be parsed."""
+
+
+@dataclass(frozen=True)
+class AccountLoadResult:
+    accounts: list[AccountRecord]
+    data_source: DataSourceName
+    data_source_detail: str
+    data_load_warning: str | None = None
 
 
 ALIASES: dict[str, list[str]] = {
@@ -55,7 +67,6 @@ ALIASES: dict[str, list[str]] = {
     "notes": ["notes", "commentary"],
     "source": ["source"],
 }
-
 
 def _sample_rows() -> list[dict[str, Any]]:
     return [
@@ -129,6 +140,13 @@ def _normalize_column_name(value: Any) -> str:
     text = str(value or "").strip().lower()
     text = re.sub(r"[^a-z0-9]+", "_", text)
     return text.strip("_")
+
+
+EXPECTED_HEADER_NAMES = {
+    _normalize_column_name(name)
+    for canonical, aliases in ALIASES.items()
+    for name in [canonical, *aliases]
+}
 
 
 def _canonicalize_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -206,6 +224,10 @@ def _load_csv_records_from_text(text: str, source_label: str) -> list[dict[str, 
         reader = csv.DictReader(io.StringIO(text))
         if not reader.fieldnames or not any((field or "").strip() for field in reader.fieldnames):
             raise AccountDataMalformedError(f"CSV source '{source_label}' is missing a header row.")
+        if not _csv_headers_look_valid(reader.fieldnames):
+            raise AccountDataMalformedError(
+                f"CSV source '{source_label}' does not contain expected account columns."
+            )
 
         records: list[dict[str, Any]] = []
         for row in reader:
@@ -220,6 +242,15 @@ def _load_csv_records_from_text(text: str, source_label: str) -> list[dict[str, 
     if not records:
         raise AccountDataMalformedError(f"CSV source '{source_label}' does not contain any data rows.")
     return records
+
+
+def _csv_headers_look_valid(fieldnames: list[str]) -> bool:
+    normalized_headers = {
+        _normalize_column_name(fieldname)
+        for fieldname in fieldnames
+        if _normalize_column_name(fieldname)
+    }
+    return bool(normalized_headers & EXPECTED_HEADER_NAMES)
 
 
 def _google_sheet_csv_url(url: str) -> str:
@@ -252,13 +283,24 @@ def load_accounts_from_csv_url(url: str) -> list[AccountRecord]:
         with urlopen(normalized_url, timeout=15) as response:
             charset = response.headers.get_content_charset() or "utf-8"
             text = response.read().decode(charset, errors="replace")
+            content_type = response.headers.get_content_type()
     except URLError as exc:
         raise AccountDataNotFoundError(f"Account data URL '{url}' could not be reached: {exc}") from exc
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise AccountDataMalformedError(f"Account data URL '{url}' could not be read: {exc}") from exc
 
+    if content_type == "text/html" or _looks_like_html(text):
+        raise AccountDataMalformedError(
+            "Google Sheet URL returned HTML instead of CSV. Ensure the sheet is published as CSV and accessible without login."
+        )
+
     records = _load_csv_records_from_text(text, normalized_url)
     return [normalise_row(row, idx) for idx, row in enumerate(records, start=1)]
+
+
+def _looks_like_html(text: str) -> bool:
+    snippet = text.lstrip().lower()[:200]
+    return snippet.startswith("<!doctype html") or snippet.startswith("<html") or "<html" in snippet
 
 
 def _cell_reference_to_index(reference: str) -> int:
@@ -366,6 +408,61 @@ def load_accounts_from_path(path: str | Path | None = None) -> list[AccountRecor
         raise AccountDataMalformedError(f"Unsupported account data format '{source.suffix}'. Use CSV or XLSX.")
 
     return [normalise_row(row, idx) for idx, row in enumerate(records, start=1)]
+
+
+def load_accounts_with_metadata(
+    *,
+    data_path: str | Path | None,
+    google_sheet_csv_url: str | None,
+) -> AccountLoadResult:
+    if google_sheet_csv_url:
+        LOGGER.info("Loading account data from Google Sheet CSV URL.")
+        try:
+            accounts = load_accounts_from_csv_url(google_sheet_csv_url)
+            return AccountLoadResult(
+                accounts=accounts,
+                data_source="google_sheet",
+                data_source_detail="Google Sheet CSV URL",
+            )
+        except AccountDataError as exc:
+            warning = (
+                "Google Sheet CSV URL failed to load; falling back to bundled sample data. "
+                f"Reason: {exc}"
+            )
+            LOGGER.warning("%s", warning)
+            if not DEFAULT_DATA_PATH.is_file():
+                raise AccountDataNotFoundError(f"Bundled sample data file '{DEFAULT_DATA_PATH}' does not exist.")
+            return AccountLoadResult(
+                accounts=load_accounts_from_path(DEFAULT_DATA_PATH),
+                data_source="sample_fallback",
+                data_source_detail=DEFAULT_DATA_PATH_LABEL,
+                data_load_warning=warning,
+            )
+
+    if data_path is not None:
+        source = Path(data_path)
+        if source.is_file():
+            LOGGER.info("Loading account data from local file: %s", source)
+            return AccountLoadResult(
+                accounts=load_accounts_from_path(source),
+                data_source="local_file",
+                data_source_detail=str(source),
+            )
+        warning = f"HERMES_DATA_PATH was set but '{source}' is not a valid file; using bundled sample data."
+        LOGGER.warning("%s", warning)
+    else:
+        warning = None
+
+    if not DEFAULT_DATA_PATH.is_file():
+        raise AccountDataNotFoundError(f"Bundled sample data file '{DEFAULT_DATA_PATH}' does not exist.")
+
+    LOGGER.info("Loading account data from bundled sample file: %s", DEFAULT_DATA_PATH_LABEL)
+    return AccountLoadResult(
+        accounts=load_accounts_from_path(DEFAULT_DATA_PATH),
+        data_source="sample_fallback",
+        data_source_detail=DEFAULT_DATA_PATH_LABEL,
+        data_load_warning=warning,
+    )
 
 
 def accounts_to_dataframe(accounts: list[AccountRecord]) -> list[dict[str, Any]]:
