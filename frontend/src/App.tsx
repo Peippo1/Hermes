@@ -172,6 +172,7 @@ export default function App() {
   );
   const connectionAlert =
     connectionState === 'backend-unavailable' || connectionState === 'request-failed' ? statusMessage : null;
+  const statusLabel = mode === 'api' ? 'Live mode' : 'Mock mode';
 
   const apiBaseUrl = hasApiBaseUrl() ? getApiBaseUrl() : 'Not configured';
 
@@ -364,21 +365,25 @@ export default function App() {
       <main className="app-shell">
         <header className="hero">
           <div className="hero-copy panel">
+            <p className="eyebrow">Hermes / AI sales enablement workflow</p>
             <div className="eyebrow-row">
-              <span className={`badge ${mode === 'mock' ? 'badge-warning' : 'badge-success'}`}>
-                {mode === 'mock' ? 'Mock mode' : 'Live mode'}
-              </span>
+              <span className={`badge ${mode === 'mock' ? 'badge-warning' : 'badge-success'}`}>{statusLabel}</span>
               <span className="status-chip">{connectionState === 'loading' ? 'Loading' : statusMessage}</span>
             </div>
-            <h1>Hermes — AI Sales Enablement Workflow Prototype</h1>
+            <h1>AI-assisted outreach, briefing, and review workflows.</h1>
             <p className="subheading">
-              Account list → personalised outreach → meeting briefing → mock outbound queue
+              Hermes turns account signals into outreach drafts, meeting prep, and a clean review queue with
+              deterministic fallback when the backend is unavailable.
             </p>
           </div>
           <div className="hero-metric panel">
-            <div className="metric-label">Selected account</div>
+            <div className="metric-label">Workflow state</div>
             <div className="metric-value">{selectedAccount?.company_name ?? 'No account selected'}</div>
             <div className="metric-subtle">{selectedAccount?.category ?? 'Choose an account to begin'}</div>
+            <div className="hero-mini-row">
+              <span className="hero-mini">{mode === 'api' ? 'Live API connected' : 'Mock fallback active'}</span>
+              <span className="hero-mini">{queueSize} queued</span>
+            </div>
           </div>
         </header>
 
@@ -411,7 +416,7 @@ export default function App() {
                 <span className="label">Queue</span>
                 <p>{queueSize} items</p>
               </div>
-              <div className="status-note">Mock queue only - no external messages are sent.</div>
+              <div className="status-note">Mock queue only — no external messages are sent.</div>
             </div>
           </div>
 
@@ -437,11 +442,11 @@ export default function App() {
           </div>
         </section>
 
-        <section className="grid">
-          <article className="card panel preview-card">
-            <div className="card-header">
+        <section className="content-stack">
+          <article className="card panel section-card">
+            <div className="section-header">
               <div>
-                <p className="card-kicker">Account preview</p>
+                <p className="card-kicker">Account / workflow</p>
                 <h2>{selectedAccount?.company_name ?? 'Select an account'}</h2>
               </div>
               <div className="mini-stat">
@@ -506,8 +511,8 @@ export default function App() {
             )}
           </article>
 
-          <article className="card panel output-card">
-            <div className="card-header">
+          <article className="card panel section-card">
+            <div className="section-header">
               <div>
                 <p className="card-kicker">Outreach</p>
                 <h2>Generated outreach message</h2>
@@ -544,11 +549,11 @@ export default function App() {
             )}
           </article>
 
-          <article className="card panel output-card briefing-card">
-            <div className="card-header">
+          <article className="card panel section-card">
+            <div className="section-header">
               <div>
                 <p className="card-kicker">Briefing</p>
-                <h2>Briefing markdown</h2>
+                <h2>Briefing note</h2>
               </div>
             </div>
             {briefing ? (
@@ -572,8 +577,8 @@ export default function App() {
             )}
           </article>
 
-          <article className="card panel output-card">
-            <div className="card-header">
+          <article className="card panel section-card">
+            <div className="section-header">
               <div>
                 <p className="card-kicker">Queue</p>
                 <h2>Mock outbound queue</h2>
@@ -583,6 +588,7 @@ export default function App() {
                 <strong>{queueSize}</strong>
               </div>
             </div>
+            <div className="quiet-note">Mock queue only — no external messages are sent.</div>
             {queue.length > 0 ? (
               <div className="table-wrap queue-table">
                 <table>
@@ -617,8 +623,8 @@ export default function App() {
             )}
           </article>
 
-          <article className="card panel output-card">
-            <div className="card-header">
+          <article className="card panel section-card">
+            <div className="section-header">
               <div>
                 <p className="card-kicker">Exports</p>
                 <h2>Artifact paths</h2>

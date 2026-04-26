@@ -9,7 +9,7 @@ Show `GET /health`.
 Talking points:
 
 - Hermes is a production-shaped prototype
-- it loads structured account data
+- it loads structured account data from CSV or a Google Sheets export
 - it generates outreach and briefing material
 - it keeps outbound work in a mock review queue
 
@@ -85,6 +85,8 @@ npm run dev
 
 4. Walk through the backend endpoints and then show the frontend reacting to the selected account, generated output, queue, and exports.
 
+5. If the backend is unavailable, leave `VITE_API_BASE_URL` unset and continue in mock mode.
+
 ## Hosted Demo Flow
 
 1. Use the deployed backend URL from Render.
@@ -96,6 +98,7 @@ npm run dev
 - The frontend switches to mock mode when `VITE_API_BASE_URL` is missing.
 - The frontend also falls back to mock mode if the backend is unavailable or a request fails.
 - The UI surfaces the fallback in the status panel so the demo can continue without interruption.
+- The workflow stays usable without blocking the rest of the demo.
 
 ## What To Show
 
@@ -127,13 +130,17 @@ npm run dev
 
 ## Productionisation Plan
 
-- add persistence for accounts and queue items
-- add approval and audit controls
-- add richer output templates for different sales motions
-- add stronger content testing and reporting
-- add observability and operational dashboards
-- add a controlled send step with explicit approvals
-- add deployment-time checks for backend health and API connectivity
+- CRM integration
+- authenticated users
+- audit logs
+- approval workflow
+- observability
+- cost tracking
+- CRM / Sheets write-back
+- persistent storage for accounts, queue items, and generated artifacts
+- controlled delivery channels only after explicit approval
+- richer output templates for different sales motions
+- stronger content testing and reporting
 
 ## What I Would Improve With More Time
 

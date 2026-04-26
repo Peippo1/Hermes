@@ -1,8 +1,8 @@
 # Hermes
 
-Hermes is a production-shaped FastAPI prototype for AI sales enablement in the experience commerce and location-based entertainment market.
+Hermes is a production-shaped prototype for AI sales enablement in the experience commerce and location-based entertainment market. It ingests account data, turns that data into personalised outreach and briefing content, and presents the output through a lightweight frontend with a mock outbound queue and export/report flows.
 
-It helps teams turn account lists into:
+It turns account lists into:
 
 - personalised outreach drafts
 - pre-meeting briefing notes
@@ -201,23 +201,27 @@ The export bundle contains 3 outreach examples, 2 briefing notes, and 3 queued o
 ## Current Limitations
 
 - No real outbound sending
+- No CRM write-back
+- No Google Sheets write-back
 - No persistent database
 - No authentication or role-based access control
-- No CRM synchronization
 - No scheduler for follow-up automation
 - No enrichment from external systems
 - No observability stack beyond the API surface
 
 ## Productionisation Plan
 
-- Add authentication and access control
-- Move accounts, queue items, and generated artifacts into persistent storage
-- Add audit logging and traceability
-- Integrate approved delivery channels with explicit send controls
-- Add retry, scheduling, and follow-up workflows
-- Expand test coverage around loader edge cases and content quality
-- Add observability and operational alerting
-- Layer in enrichment only after source fidelity and approval flows are in place
+- CRM integration
+- Authenticated users
+- Audit logs
+- Approval workflow
+- Observability
+- Cost tracking
+- CRM / Sheets write-back
+- Persistent storage for accounts, queue items, and generated artifacts
+- Controlled delivery channels only after explicit approval
+- Retry, scheduling, and follow-up workflows
+- Continued test coverage for loader edge cases and content quality
 
 ## API Surface
 
