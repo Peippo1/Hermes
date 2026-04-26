@@ -42,8 +42,65 @@ Live-agent mode is optional. The backend remains deterministic by default.
 
 ```bash
 export HERMES_USE_LIVE_AGENTS=true
-export AGENT_API_KEY=your_key_here
+export OPENAI_API_KEY=your_key_here
+export HERMES_MODEL=gpt-4.1-mini
 ```
+
+## Frontend
+
+The repo includes a lightweight Vite + React + TypeScript frontend in `frontend/`.
+
+Run it locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+If the backend is running on another origin, set:
+
+```bash
+cp .env.example .env
+```
+
+Then update `VITE_API_BASE_URL` in `frontend/.env` to the backend base URL, for example:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+If `VITE_API_BASE_URL` is missing, the UI switches to demo mock mode and uses local sample data.
+
+## Render Deploy
+
+To deploy the backend on Render:
+
+1. Create a new Render web service.
+2. Connect the GitHub repository.
+3. Set the build command to `pip install -r requirements.txt`.
+4. Set the start command to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+5. Add environment variables:
+   - `OPENAI_API_KEY` if live-agent mode will be used
+   - `HERMES_USE_LIVE_AGENTS=false`
+   - `HERMES_MODEL=gpt-4.1-mini`
+   - `CORS_ORIGINS` with the frontend origin, such as the local Vite URL and the eventual Vercel URL
+   - `HERMES_DATA_PATH` only if you want to override the bundled sample export
+6. Set the health check path to `/health`.
+
+The backend starts with the bundled sample data by default, so no extra database setup is required for the first deployment.
+
+## Vercel Deploy
+
+To deploy the frontend to Vercel:
+
+1. Import the repository into Vercel.
+2. Set the project root to `frontend`.
+3. Add `VITE_API_BASE_URL` as an environment variable if you want the deployed UI to call a backend API.
+4. Use the default Vite build command, `npm run build`.
+5. Use the default output directory, `dist`.
+
+If you deploy the frontend without a backend URL, it still runs in mock mode for demos.
 
 ## Demo Walkthrough
 

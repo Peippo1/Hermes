@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from .agents import agent_mode
 from .config import get_config
@@ -16,10 +17,29 @@ from .workflows import generate_briefing, generate_outreach, queue_outreach
 config = get_config()
 app = FastAPI(title=config.app_name, version="0.2.0")
 
+default_cors_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+configured_cors_origins = [
+    origin.strip()
+    for origin in config.cors_origins.split(",")
+    if origin.strip()
+]
+allowed_cors_origins = list(dict.fromkeys(default_cors_origins + configured_cors_origins))
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class RuntimeState:
     def __init__(self) -> None:
-        self.accounts = load_accounts_from_path(config.data_path)
+        self.accounts = load_accounts_from_path(self._resolve_data_path())
         self.queue = SendQueue()
 
     def get_account(self, account_id: str) -> AccountRecord | None:
@@ -27,6 +47,13 @@ class RuntimeState:
             if account.account_id == account_id:
                 return account
         return None
+
+    def _resolve_data_path(self) -> Path:
+        candidates = [config.data_path, Path(__file__).resolve().parent.parent / "data" / "sample_accounts.csv", Path(__file__).resolve().parent.parent / "outputs" / "sample_accounts.csv"]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return candidates[0]
 
 
 try:

@@ -13,6 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "outputs"
 PROMPTS_DIR = BASE_DIR / "prompts"
 DEFAULT_DATA_PATH = BASE_DIR / "data" / "sample_accounts.csv"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass(frozen=True)
@@ -21,7 +22,9 @@ class AppConfig:
     generated_dir: Path = OUTPUT_DIR
     prompts_dir: Path = PROMPTS_DIR
     use_live_agents: bool = os.getenv("HERMES_USE_LIVE_AGENTS", "false").lower() in {"1", "true", "yes"}
-    agent_api_key: str | None = os.getenv("AGENT_API_KEY")
+    agent_api_key: str | None = os.getenv("OPENAI_API_KEY") or os.getenv("AGENT_API_KEY")
+    model_name: str = os.getenv("HERMES_MODEL", "gpt-4.1-mini")
+    cors_origins: str = os.getenv("CORS_ORIGINS", "")
     app_name: str = "Hermes"
 
 
