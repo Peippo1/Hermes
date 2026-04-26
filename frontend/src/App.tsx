@@ -56,6 +56,82 @@ function joinList(values: string[] | undefined): string {
   return values && values.length > 0 ? values.join(' • ') : 'None';
 }
 
+function renderBriefingMarkdown(markdown: string): JSX.Element[] {
+  const blocks: JSX.Element[] = [];
+  const lines = markdown.split('\n');
+  let paragraph: string[] = [];
+  let listItems: string[] = [];
+
+  function flushParagraph() {
+    if (paragraph.length === 0) return;
+    blocks.push(
+      <p key={`p-${blocks.length}`} className="briefing-paragraph">
+        {paragraph.join(' ')}
+      </p>
+    );
+    paragraph = [];
+  }
+
+  function flushList() {
+    if (listItems.length === 0) return;
+    blocks.push(
+      <ul key={`ul-${blocks.length}`} className="briefing-list">
+        {listItems.map((item, index) => (
+          <li key={`li-${blocks.length}-${index}`}>{item}</li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  }
+
+  function flush() {
+    flushParagraph();
+    flushList();
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)$/);
+    if (headingMatch) {
+      flush();
+      const level = headingMatch[1].length;
+      const Tag = `h${Math.min(level, 3)}` as keyof JSX.IntrinsicElements;
+      blocks.push(
+        <Tag key={`h-${blocks.length}`} className={`briefing-heading briefing-heading-${Tag}`}>
+          {headingMatch[2]}
+        </Tag>
+      );
+      continue;
+    }
+
+    if (line.startsWith('- ')) {
+      flushParagraph();
+      listItems.push(line.slice(2).trim());
+      continue;
+    }
+
+    if (line.startsWith('Objection:')) {
+      flushParagraph();
+      blocks.push(
+        <p key={`p-${blocks.length}`} className="briefing-paragraph">
+          {line}
+        </p>
+      );
+      continue;
+    }
+
+    paragraph.push(line);
+  }
+
+  flush();
+  return blocks;
+}
+
 function initialLoadingState(): ActionLoadingState {
   return {
     outreach: false,
@@ -335,7 +411,7 @@ export default function App() {
                 <span className="label">Queue</span>
                 <p>{queueSize} items</p>
               </div>
-              <div className="status-note">Mock queue only — no external sending.</div>
+              <div className="status-note">Mock queue only - no external messages are sent.</div>
             </div>
           </div>
 
@@ -453,7 +529,7 @@ export default function App() {
                   <p>{outreach.estimated_impact}</p>
                 </div>
                 <div className="message-card">
-                  <pre>{outreach.message}</pre>
+                  <div className="message-body">{outreach.message}</div>
                 </div>
                 <div className="flag-list">
                   {outreach.guardrail_flags.map((flag) => (
@@ -480,8 +556,8 @@ export default function App() {
                 <div className="output-meta">
                   <span>Opportunity summary: {briefing.opportunity_summary}</span>
                 </div>
-                <div className="markdown-card">
-                  <pre>{briefing.briefing_markdown}</pre>
+                <div className="briefing-card markdown-card">
+                  {renderBriefingMarkdown(briefing.briefing_markdown)}
                 </div>
                 <div className="flag-list">
                   {briefing.guardrail_flags.map((flag) => (

@@ -110,11 +110,11 @@ def _estimated_impact(account: AccountRecord) -> str:
 def _format_currency(value: float | int) -> str:
     amount = float(value)
     if abs(amount) >= 1_000_000:
-        text = f"£{amount / 1_000_000:.2f}m"
-        return text.replace(".00m", "m").replace(".0m", "m")
+        text = f"£{amount / 1_000_000:.2f}".rstrip("0").rstrip(".")
+        return f"{text}m"
     if abs(amount) >= 1_000:
-        text = f"£{amount / 1_000:.1f}k"
-        return text.replace(".0k", "k")
+        text = f"£{amount / 1_000:.1f}".rstrip("0").rstrip(".")
+        return f"{text}k"
     if amount.is_integer():
         return f"£{int(amount)}"
     return f"£{amount:.2f}"
@@ -293,13 +293,15 @@ def _company_overview_lines(account: AccountRecord) -> list[str]:
     category = account.category or "commercial"
     sub_category = account.sub_category or "unspecified sub-category"
     location = account.hq_location or account.region or "an unspecified location"
-    site_count = str(account.number_of_sites) if account.number_of_sites is not None else "not provided"
+    site_count = (
+        f"{account.number_of_sites} site" if account.number_of_sites == 1 else f"{account.number_of_sites} sites"
+    ) if account.number_of_sites is not None else "not provided"
     visits = f"{account.estimated_annual_visits:,}" if account.estimated_annual_visits is not None else "not provided"
     ticket = _format_currency(account.estimated_average_ticket_price) if account.estimated_average_ticket_price is not None else "not provided"
     revenue = _format_currency(account.estimated_annual_revenue) if account.estimated_annual_revenue is not None else "not provided"
     lines = [
         f"{account.company_name} sits in the {category} space, with a sub-category of {sub_category}.",
-        f"The account is based in {location} and is represented here with {site_count} site(s).",
+        f"The account is based in {location} and is represented here with {site_count}.",
         f"Estimated annual visits: {visits}. Average ticket price: {ticket}. Estimated annual revenue: {revenue}.",
     ]
     if account.description:
@@ -347,9 +349,9 @@ def _opportunity_summary(account: AccountRecord, meeting_persona: str | None, fo
     objective = account.objective or "a practical commercial next step"
     area_text = ", ".join(areas) if areas else "conversion improvement and operational simplification"
     return (
-        f"For {persona}, the clearest angle is to link {signal} to {objective}. "
-        f"Focus the conversation on {area_text}. "
-        f"The most useful next step is a quick review of one real workflow or enquiry path, so the team can judge value without broad platform claims."
+        f"For a {persona}, the clearest angle is to connect {signal} to {objective}. "
+        f"The discussion should stay centred on {area_text}, because that is where the quickest commercial win is most likely to show up. "
+        f"A short review of one real workflow or enquiry path is usually enough to judge value without broad platform claims."
     )
 
 
@@ -396,7 +398,7 @@ def _quantified_value_case(account: AccountRecord) -> str:
 
 def _suggested_questions(account: AccountRecord, focus: str) -> list[str]:
     questions = [
-        f"What is the current priority behind {account.objective or 'the next commercial step'}?",
+        f"What is driving the focus on {account.objective or 'the next commercial step'}?",
         "Where is the team losing the most value today: conversion, upsell, support, or reporting?",
         "Which enquiry, booking, or support step still needs manual follow-up?",
         "What would a small test need to prove before anyone would scale it?",
@@ -447,11 +449,11 @@ def _briefing_markdown(account: AccountRecord, meeting_persona: str | None, focu
     overview = _company_overview_lines(account)
     persona = _briefing_persona(account, meeting_persona)
     if account.contact_name and account.contact_role:
-        persona_block = f"Primary contact: {account.contact_name} ({account.contact_role})."
+        persona_block = f"For a {account.contact_role}, the primary contact is {account.contact_name}."
     elif account.contact_name:
         persona_block = f"Primary contact: {account.contact_name}."
     elif account.contact_role:
-        persona_block = f"Likely persona: {account.contact_role}."
+        persona_block = f"For a {account.contact_role}."
     else:
         persona_block = f"Likely persona: {persona}."
 

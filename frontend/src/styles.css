@@ -374,9 +374,7 @@ code {
   background: #fffaf1;
 }
 
-.message-card pre,
-.markdown-card pre {
-  margin: 0;
+.message-body {
   padding: 18px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -384,10 +382,50 @@ code {
   font-size: 0.98rem;
   line-height: 1.75;
   color: var(--text);
+  background: linear-gradient(180deg, rgba(75, 107, 136, 0.04), rgba(75, 107, 136, 0.02));
 }
 
-.message-card pre {
-  background: linear-gradient(180deg, rgba(75, 107, 136, 0.04), rgba(75, 107, 136, 0.02));
+.briefing-card {
+  padding: 18px 18px 6px;
+}
+
+.briefing-heading {
+  margin: 1.25rem 0 0.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.briefing-heading-h1 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.briefing-heading-h2 {
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.briefing-heading-h3 {
+  font-size: 0.98rem;
+  color: var(--text);
+}
+
+.briefing-paragraph {
+  margin: 0 0 0.9rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.briefing-list {
+  margin: 0 0 1rem 1.2rem;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.briefing-list li {
+  line-height: 1.65;
+  color: var(--text);
 }
 
 .flag-list {
@@ -445,6 +483,7 @@ th {
   padding: 12px 14px;
   background: rgba(75, 107, 136, 0.06);
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 900px) {
@@ -490,6 +529,10 @@ th {
   .actions,
   .button-row {
     flex-direction: column;
+  }
+
+  .status-note {
+    grid-column: span 1;
   }
 
   button {

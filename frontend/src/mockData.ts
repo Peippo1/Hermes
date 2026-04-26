@@ -15,7 +15,7 @@ import type {
 const sampleAccounts: AccountRecord[] = [
   {
     account_id: 'A-001',
-    company_name: 'Company 001',
+    company_name: 'Northstar Leisure Group',
     category: 'family entertainment',
     sub_category: 'multi-site indoor entertainment',
     description: 'A multi-site leisure operator with growth plans and a near-term launch window.',
@@ -26,7 +26,7 @@ const sampleAccounts: AccountRecord[] = [
     estimated_transaction_volume: 510000,
     estimated_annual_revenue: 30400000,
     region: 'UK North',
-    contact_name: 'Contact 001',
+    contact_name: 'Avery Hughes',
     contact_role: 'Commercial Director',
     website: 'https://example.invalid/001',
     signal: 'new venue opening within the next quarter',
@@ -36,7 +36,7 @@ const sampleAccounts: AccountRecord[] = [
   },
   {
     account_id: 'A-002',
-    company_name: 'Company 002',
+    company_name: 'Harbor Experience Co',
     category: 'immersive attraction',
     sub_category: 'single-site attraction',
     description: 'A destination attraction focused on retention and repeat visits.',
@@ -47,7 +47,7 @@ const sampleAccounts: AccountRecord[] = [
     estimated_transaction_volume: 183000,
     estimated_annual_revenue: 13020000,
     region: 'Greater London',
-    contact_name: 'Contact 002',
+    contact_name: 'Mina Patel',
     contact_role: 'Head of Growth',
     website: 'https://example.invalid/002',
     signal: 'loyalty and retention campaign is active',
@@ -57,7 +57,7 @@ const sampleAccounts: AccountRecord[] = [
   },
   {
     account_id: 'A-003',
-    company_name: 'Company 003',
+    company_name: 'Vertex Social Games',
     category: 'social gaming',
     sub_category: 'group entertainment venue',
     description: 'A group venue expanding its corporate events motion.',
@@ -68,7 +68,7 @@ const sampleAccounts: AccountRecord[] = [
     estimated_transaction_volume: 119000,
     estimated_annual_revenue: 7560000,
     region: 'Midlands',
-    contact_name: 'Contact 003',
+    contact_name: 'Jordan Price',
     contact_role: 'Revenue Lead',
     website: 'https://example.invalid/003',
     signal: 'corporate events team was recently expanded',
@@ -78,7 +78,7 @@ const sampleAccounts: AccountRecord[] = [
   },
   {
     account_id: 'A-004',
-    company_name: 'Company 004',
+    company_name: 'Trailhead Adventure Co',
     category: 'active play',
     sub_category: 'regional leisure chain',
     description: 'A regional chain planning site expansion and yield improvements.',
@@ -89,7 +89,7 @@ const sampleAccounts: AccountRecord[] = [
     estimated_transaction_volume: 334000,
     estimated_annual_revenue: 13065000,
     region: 'Yorkshire',
-    contact_name: 'Contact 004',
+    contact_name: 'Sophie Reed',
     contact_role: 'Operations Director',
     website: 'https://example.invalid/004',
     signal: 'site expansion planning is underway',
@@ -427,4 +427,3 @@ export function buildMockExport(account: AccountRecord): { outreach: OutreachDra
   const queueItem = enqueueMockOutreach(account);
   return { outreach, briefing, queueItem, artifacts: buildMockArtifacts() };
 }
-
