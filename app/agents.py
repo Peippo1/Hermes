@@ -52,6 +52,18 @@ def _value_props(account: AccountRecord) -> list[str]:
     return props[:3]
 
 
+def _message_focus(account: AccountRecord) -> str:
+    if account.objective:
+        return account.objective
+    if account.signal and account.number_of_sites:
+        return "booking conversion and repeat visits"
+    if account.signal:
+        return "the current commercial opportunity"
+    if account.number_of_sites:
+        return "commercial consistency across the footprint"
+    return "a practical commercial next step"
+
+
 def _business_insight(account: AccountRecord) -> str:
     location = account.hq_location or account.region or "the account's market"
     if account.number_of_sites and account.objective:
@@ -88,9 +100,9 @@ def _estimated_impact(account: AccountRecord) -> str:
 
 def _tone_opening(tone: str) -> str:
     return {
-        "concise": "I'm sharing one practical idea based on the account record.",
-        "warm": "I noticed a few details in the account record that may be relevant.",
-        "direct": "A short, practical note based on the account record:",
+        "concise": "Saw a few signals that made this worth a note.",
+        "warm": "Noticed a few signals that felt relevant.",
+        "direct": "Reaching out because this looks like a practical fit.",
     }[tone]
 
 
@@ -104,15 +116,26 @@ def _channel_suffix(channel: str) -> str:
 def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
     greeting = account.contact_name or "there"
     opening = _tone_opening(tone)
-    value_prop = _value_props(account)[0]
-    business_line = _business_insight(account)
+    focus = _message_focus(account)
+    if account.signal and "opening" in account.signal.lower():
+        signal_line = f"{account.company_name} is opening a new venue soon."
+    elif account.signal:
+        signal_line = f"{account.company_name} has a clear current signal: {account.signal}."
+    else:
+        signal_line = f"{account.company_name} is moving through a practical growth phase."
+
+    if account.number_of_sites == 1:
+        site_line = "For a single-site business, "
+    elif account.number_of_sites:
+        site_line = f"For an {account.number_of_sites}-site footprint, "
+    else:
+        site_line = "For teams like yours, "
     suffix = _channel_suffix(channel)
-    closing = "Best,\nHermes"
-    if channel == "linkedin":
-        closing = "Hermes"
+    closing = "Best,\nHermes" if channel == "email" else "Hermes"
     message = (
-        f"Hi {greeting}, {opening} {business_line} "
-        f"The most relevant angle looks like {value_prop.lower()}. "
+        f"Hi {greeting}, {opening} {signal_line} "
+        f"{site_line}the priority is usually {focus}. "
+        f"We can help turn that into a concise outreach note and a low-pressure next step. "
         f"{suffix} {closing}"
     )
     words = message.split()
@@ -127,6 +150,10 @@ def _named_claim_tokens(account: AccountRecord) -> set[str]:
         "I",
         "I'm",
         "If",
+        "Saw",
+        "Noticed",
+        "We",
+        "Worth",
         "The",
         "A",
         "As",

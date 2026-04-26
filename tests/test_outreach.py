@@ -12,6 +12,17 @@ class OutreachEndpointTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
 
+    def assert_no_internal_wording(self, message: str) -> None:
+        lowered = message.lower()
+        forbidden_phrases = [
+            "account record",
+            "source-backed tokens",
+            "guardrails",
+            "internal data",
+        ]
+        for phrase in forbidden_phrases:
+            self.assertNotIn(phrase, lowered)
+
     def test_generate_outreach_default(self) -> None:
         response = self.client.post("/generate/outreach", json={"account_id": "ACCT-001"})
         self.assertEqual(response.status_code, 200)
@@ -27,7 +38,13 @@ class OutreachEndpointTests(unittest.TestCase):
         self.assertIn("message", payload)
         self.assertIn("guardrail_flags", payload)
         self.assertLessEqual(len(payload["message"].split()), 140)
+        self.assertLessEqual(len(payload["message"].split()), 120)
+        self.assert_no_internal_wording(payload["message"])
         self.assertEqual(payload["guardrail_flags"], [])
+        self.assertIn("Northstar Leisure Group", payload["message"])
+        self.assertTrue(
+            "bookings" in payload["message"].lower() or "memberships" in payload["message"].lower()
+        )
 
     def test_generate_outreach_with_channel_and_tone(self) -> None:
         response = self.client.post(
@@ -40,6 +57,8 @@ class OutreachEndpointTests(unittest.TestCase):
         self.assertEqual(payload["account_id"], "ACCT-002")
         self.assertEqual(payload["company_name"], "Harbor Experience Co")
         self.assertLessEqual(len(payload["message"].split()), 140)
+        self.assertLessEqual(len(payload["message"].split()), 120)
+        self.assert_no_internal_wording(payload["message"])
         self.assertEqual(payload["guardrail_flags"], [])
 
     def test_generate_outreach_missing_account(self) -> None:
