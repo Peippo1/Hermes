@@ -287,10 +287,10 @@ export default function App() {
     <div className="shell">
       <main className="app-shell">
         <header className="hero">
-          <div className="hero-copy">
+          <div className="hero-copy panel">
             <div className="eyebrow-row">
               <span className={`badge ${mode === 'mock' ? 'badge-warning' : 'badge-success'}`}>
-                {mode === 'mock' ? 'Demo mock mode' : 'Connected mode'}
+                {mode === 'mock' ? 'Mock mode' : 'Live mode'}
               </span>
               <span className="status-chip">{connectionState === 'loading' ? 'Loading' : statusMessage}</span>
             </div>
@@ -299,14 +299,14 @@ export default function App() {
               Account list → personalised outreach → meeting briefing → mock outbound queue
             </p>
           </div>
-          <div className="hero-metric">
+          <div className="hero-metric panel">
             <div className="metric-label">Selected account</div>
             <div className="metric-value">{selectedAccount?.company_name ?? 'No account selected'}</div>
             <div className="metric-subtle">{selectedAccount?.category ?? 'Choose an account to begin'}</div>
           </div>
         </header>
 
-        <section className="control-bar card">
+        <section className="control-bar panel">
           <div className="control-grid">
             <div className="field">
               <label htmlFor="account">Account selector</label>
@@ -322,7 +322,7 @@ export default function App() {
                 ))}
               </select>
             </div>
-            <div className="status-panel">
+            <div className="status-panel panel">
               <div>
                 <span className="label">API base URL</span>
                 <p>{apiBaseUrl}</p>
@@ -342,7 +342,7 @@ export default function App() {
           {connectionAlert ? <div className="error-banner">{connectionAlert}</div> : null}
           {actionError ? <div className="error-banner">{actionError}</div> : null}
 
-          <div className="button-row">
+          <div className="button-row actions">
             <button type="button" onClick={handleGenerateOutreach} disabled={loading.outreach}>
               {actionLabel('Generate Outreach', loading.outreach)}
             </button>
@@ -362,7 +362,7 @@ export default function App() {
         </section>
 
         <section className="grid">
-          <article className="card preview-card">
+          <article className="card panel preview-card">
             <div className="card-header">
               <div>
                 <p className="card-kicker">Account preview</p>
@@ -430,7 +430,7 @@ export default function App() {
             )}
           </article>
 
-          <article className="card output-card">
+          <article className="card panel output-card">
             <div className="card-header">
               <div>
                 <p className="card-kicker">Outreach</p>
@@ -468,7 +468,7 @@ export default function App() {
             )}
           </article>
 
-          <article className="card output-card">
+          <article className="card panel output-card briefing-card">
             <div className="card-header">
               <div>
                 <p className="card-kicker">Briefing</p>
@@ -496,7 +496,7 @@ export default function App() {
             )}
           </article>
 
-          <article className="card output-card">
+          <article className="card panel output-card">
             <div className="card-header">
               <div>
                 <p className="card-kicker">Queue</p>
@@ -508,7 +508,7 @@ export default function App() {
               </div>
             </div>
             {queue.length > 0 ? (
-              <div className="table-wrap">
+              <div className="table-wrap queue-table">
                 <table>
                   <thead>
                     <tr>
@@ -541,7 +541,7 @@ export default function App() {
             )}
           </article>
 
-          <article className="card output-card">
+          <article className="card panel output-card">
             <div className="card-header">
               <div>
                 <p className="card-kicker">Exports</p>
