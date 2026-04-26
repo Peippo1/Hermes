@@ -4,13 +4,14 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from tests.test_support import load_test_app_module
 
 
 class BriefingEndpointTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.client = TestClient(app)
+        cls.main_module = load_test_app_module()
+        cls.client = TestClient(cls.main_module.app)
 
     def test_generate_briefing_default(self) -> None:
         response = self.client.post(

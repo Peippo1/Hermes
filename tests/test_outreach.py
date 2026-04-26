@@ -4,13 +4,14 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from tests.test_support import load_test_app_module
 
 
 class OutreachEndpointTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.client = TestClient(app)
+        cls.main_module = load_test_app_module()
+        cls.client = TestClient(cls.main_module.app)
 
     def assert_no_internal_wording(self, message: str) -> None:
         lowered = message.lower()
