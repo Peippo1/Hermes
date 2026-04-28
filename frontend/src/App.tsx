@@ -132,6 +132,16 @@ function accountOptionLabel(account: AccountRecord): string {
   return parts.join(' · ');
 }
 
+function renderMessagePreview(message: string): JSX.Element[] {
+  return message
+    .split(/\n{2,}/)
+    .map((paragraph, index) => (
+      <p key={`msg-${index}`} className="message-paragraph">
+        {paragraph}
+      </p>
+    ));
+}
+
 function renderBriefingMarkdown(markdown: string): JSX.Element[] {
   const blocks: JSX.Element[] = [];
   const lines = markdown.split('\n');
@@ -204,19 +214,23 @@ function renderBriefingMarkdown(markdown: string): JSX.Element[] {
       continue;
     }
 
-    if (line.startsWith('Objection:') || line.startsWith('- Objection:')) {
+    if (line.startsWith('- **Objection:**') || line.startsWith('**Objection:**') || line.startsWith('Objection:') || line.startsWith('- Objection:')) {
       flushParagraph();
       flushList();
       flushObjection();
       objection = {
-        objection: line.replace(/^- /, '').replace(/^Objection:\s*/, ''),
+        objection: line
+          .replace(/^- \*\*Objection:\*\*\s*/, '')
+          .replace(/^\*\*Objection:\*\*\s*/, '')
+          .replace(/^- /, '')
+          .replace(/^Objection:\s*/, ''),
         response: ''
       };
       continue;
     }
 
-    if (line.startsWith('Response:') && objection) {
-      objection.response = line.replace(/^Response:\s*/, '');
+    if ((line.startsWith('**Response:**') || line.startsWith('Response:')) && objection) {
+      objection.response = line.replace(/^\*\*Response:\*\*\s*/, '').replace(/^Response:\s*/, '');
       continue;
     }
 
@@ -702,7 +716,7 @@ export default function App() {
         </section>
 
         <section className="content-stack">
-          <article className={`card panel section-card ${outreach ? 'output-card-fade-in' : ''}`}>
+          <article className="card panel section-card">
             <div className="section-header">
               <div>
                 <p className="card-kicker">Account / workflow</p>
@@ -784,7 +798,7 @@ export default function App() {
             )}
           </article>
 
-          <article className={`card panel section-card ${briefing ? 'output-card-fade-in' : ''}`}>
+          <article className={`card panel section-card ${outreach ? 'output-card-fade-in' : ''}`}>
             <div className="section-header">
               <div>
                 <p className="card-kicker">Outreach</p>
@@ -793,6 +807,10 @@ export default function App() {
             </div>
             {outreach ? (
               <>
+                <div className="output-label-row">
+                  <span className="output-label">Message preview</span>
+                  <span className="output-note">Generated from account data and review-safe workflow rules.</span>
+                </div>
                 <div className="output-meta">
                   <span>Persona: {outreach.contact_role || 'Commercial lead'}</span>
                   <span>Channel: {outreach.channel}</span>
@@ -807,7 +825,7 @@ export default function App() {
                   <p>{outreach.estimated_impact}</p>
                 </div>
                 <div className="message-card">
-                  <div className="message-body">{outreach.message}</div>
+                  <div className="message-body">{renderMessagePreview(outreach.message)}</div>
                 </div>
                 {outreach.guardrail_flags.length > 0 ? (
                   <div className="flag-list">
@@ -824,7 +842,7 @@ export default function App() {
             )}
           </article>
 
-          <article className="card panel section-card">
+          <article className={`card panel section-card ${briefing ? 'output-card-fade-in' : ''}`}>
             <div className="section-header">
               <div>
                 <p className="card-kicker">Briefing</p>
@@ -833,8 +851,9 @@ export default function App() {
             </div>
             {briefing ? (
               <>
-                <div className="output-meta">
-                  <span>Opportunity summary: {briefing.opportunity_summary}</span>
+                <div className="briefing-summary">
+                  <span className="output-label">Opportunity summary</span>
+                  <p>{briefing.opportunity_summary}</p>
                 </div>
                 <div className="briefing-card markdown-card">
                   {renderBriefingMarkdown(briefing.briefing_markdown)}

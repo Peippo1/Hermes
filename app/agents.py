@@ -236,7 +236,14 @@ def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
         if account.contact_role
         else ""
     )
-    message = f"Hi {greeting}, {opening}{metric_clause}{role_clause} Worth a quick look at where the booking and group-sales journey could be tightened?"
+    lead = f"Hi {greeting}, {opening}{metric_clause}"
+    middle = f"{role_clause.strip()}".strip()
+    closing = "Worth a quick look at where the booking and group-sales journey could be tightened?"
+    message_lines = [lead.strip()]
+    if middle:
+        message_lines.append(middle)
+    message_lines.append(closing)
+    message = "\n\n".join(message_lines)
     words = message.split()
     if len(words) > 100:
         message = " ".join(words[:100])
@@ -515,8 +522,8 @@ def _systems_context() -> str:
 def _recommended_next_step(account: AccountRecord, focus: str) -> str:
     _ = focus
     return (
-        "Use the first call to choose one journey to inspect - for example group bookings, private hire, checkout conversion, "
-        "or post-visit upsell - then agree whether a small workflow test is worth running."
+        "Use the first call to choose one journey to inspect — for example group bookings, private hire, checkout conversion, "
+        "or post-visit upsell — then agree whether a small workflow test is worth running."
     )
 
 
@@ -553,7 +560,7 @@ def _briefing_markdown(account: AccountRecord, meeting_persona: str | None, focu
             "",
             "## 6. Likely Objections",
             *[
-                f"- Objection: {objection}\n  Response: {response}"
+                f"- **Objection:** {objection}\n  **Response:** {response}"
                 for objection, response in _likely_objections()
             ],
             "",

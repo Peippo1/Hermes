@@ -596,13 +596,46 @@ code {
 
 .message-body {
   padding: 18px;
-  white-space: pre-wrap;
-  word-break: break-word;
   font-family: inherit;
   font-size: 1rem;
   line-height: 1.8;
   color: var(--text);
   background: linear-gradient(180deg, rgba(75, 107, 136, 0.03), rgba(75, 107, 136, 0.01));
+}
+
+.message-paragraph {
+  margin: 0 0 0.95rem;
+}
+
+.message-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.output-label-row,
+.briefing-summary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.output-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.output-note {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.briefing-summary p {
+  margin: 0;
+  line-height: 1.65;
+  color: var(--text);
 }
 
 .briefing-card {
@@ -613,7 +646,7 @@ code {
 }
 
 .briefing-heading {
-  margin: 1.4rem 0 0.8rem;
+  margin: 1.6rem 0 0.9rem;
   line-height: 1.2;
   letter-spacing: -0.03em;
 }
@@ -640,22 +673,22 @@ code {
 }
 
 .briefing-list {
-  margin: 0 0 1rem 1.25rem;
+  margin: 0 0 1.2rem 1.25rem;
   padding: 0;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.8rem;
 }
 
 .briefing-list li {
-  line-height: 1.7;
+  line-height: 1.75;
   color: var(--text);
 }
 
 .objection-block {
   display: grid;
-  gap: 10px;
-  margin: 0 0 1rem;
-  padding: 14px 16px;
+  gap: 12px;
+  margin: 0 0 1.1rem;
+  padding: 15px 16px;
   border-radius: 14px;
   background: rgba(75, 107, 136, 0.05);
   border: 1px solid rgba(30, 41, 59, 0.06);
@@ -664,7 +697,7 @@ code {
 .objection-line,
 .response-line {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   line-height: 1.65;
 }
 

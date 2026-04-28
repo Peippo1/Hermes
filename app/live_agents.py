@@ -187,7 +187,7 @@ def generate_live_briefing(
             "Write sales briefing material, not template prose.",
             "Use the account's objective, signal, and commercial scale data.",
             "Keep opportunity analysis specific and practical.",
-            "Use a compact objection and response structure rather than inline prose.",
+            "Use paragraph breaks in outreach and a compact objection/response markdown structure in briefing notes.",
             "Use only platform categories in the systems context section.",
         ],
     }

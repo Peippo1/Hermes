@@ -267,7 +267,7 @@ function composeMessage(account: AccountRecord, tone: Tone): string {
     firstLine,
     `${secondLine}${roleClause}`,
     closing
-  ].join(' ');
+  ].join('\n\n');
   const words = message.split(/\s+/);
   return words.length > 100 ? words.slice(0, 100).join(' ') : message;
 }
@@ -331,7 +331,7 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
     ['We need to avoid adding complexity.', 'Position the conversation as one narrow test around a single journey, not a platform replacement.']
   ] as const;
   const systemsContext = 'Most teams in this space operate across separate ticketing, booking, CRM, support, spreadsheet, and reporting tools. The briefing should treat the opportunity as a way to connect those systems more cleanly, not replace everything at once.';
-  const nextStep = 'Use the first call to choose one journey to inspect - for example group bookings, private hire, checkout conversion, or post-visit upsell - then agree whether a small workflow test is worth running.';
+  const nextStep = 'Use the first call to choose one journey to inspect — for example group bookings, private hire, checkout conversion, or post-visit upsell — then agree whether a small workflow test is worth running.';
 
   return [
     `# Meeting Brief: ${account.company_name}`,
@@ -358,7 +358,7 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
     ...talkingPoints.map((line) => `- ${line}`),
     '',
     '## 6. Likely Objections',
-    ...objections.flatMap(([objection, response]) => [`Objection: ${objection}`, `Response: ${response}`, '']),
+    ...objections.flatMap(([objection, response]) => [`- **Objection:** ${objection}`, `  **Response:** ${response}`, '']),
     '',
     '## 7. Competitive / Systems Context',
     systemsContext,
