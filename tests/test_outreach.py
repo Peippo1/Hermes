@@ -4,6 +4,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
+from app.agents import build_outreach_draft
+from app.models import AccountRecord
 from tests.test_support import load_test_app_module
 
 
@@ -90,6 +92,33 @@ class OutreachEndpointTests(unittest.TestCase):
     def test_generate_outreach_missing_account(self) -> None:
         response = self.client.post("/generate/outreach", json={"account_id": "MISSING"})
         self.assertEqual(response.status_code, 404)
+
+    def test_generate_outreach_uses_richer_metrics(self) -> None:
+        account = AccountRecord(
+            account_id="NQ64",
+            company_name="NQ64",
+            category="Competitive Socialising",
+            sub_category="Arcade Bar",
+            description="Retro arcade bar with classic games and craft drinks",
+            hq_location="Manchester",
+            number_of_sites=10,
+            estimated_annual_visits=1500000,
+            estimated_average_ticket_price=8,
+            estimated_transaction_volume=12000000,
+            estimated_annual_revenue=420000,
+            region="UK",
+            contact_name="James Palmer",
+            contact_role="Head of Partnerships",
+        )
+
+        draft = build_outreach_draft(account, channel="email", tone="concise")
+
+        self.assertIn("Head of Partnerships", draft.message)
+        self.assertIn("10-site footprint", draft.message)
+        self.assertIn("1.5m annual visits", draft.message)
+        self.assertIn("$12m", draft.message)
+        self.assertNotIn("moving through a practical growth phase", draft.message)
+        self.assertNotIn("A cleaner workflow can help", draft.message)
 
 
 if __name__ == "__main__":

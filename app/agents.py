@@ -36,32 +36,30 @@ def _persona_for_queue(account: AccountRecord) -> str:
     return "commercial lead"
 
 
-def _value_props(account: AccountRecord) -> list[str]:
-    props: list[str] = []
-    if account.number_of_sites:
-        site_label = "site" if account.number_of_sites == 1 else "sites"
-        props.append(f"Support commercial consistency across {account.number_of_sites} {site_label}")
-    if account.objective:
-        props.append(f"Align the first conversation to the stated objective: {account.objective}")
-    if account.signal:
-        props.append(f"Use the current signal as a practical opening: {account.signal}")
-    if not props and account.description:
-        props.append(f"Reflect the operating model described in the account record: {account.description}")
-    if not props:
-        props.append("Open a practical commercial conversation grounded in the account record")
-    return props[:3]
+def _format_quantity(value: int | float) -> str:
+    amount = float(value)
+    if abs(amount) >= 1_000_000:
+        text = f"{amount / 1_000_000:.2f}".rstrip("0").rstrip(".")
+        return f"{text}m"
+    if abs(amount) >= 1_000:
+        text = f"{amount / 1_000:.1f}".rstrip("0").rstrip(".")
+        return f"{text}k"
+    if amount.is_integer():
+        return f"{int(amount)}"
+    return f"{amount:.1f}".rstrip("0").rstrip(".")
 
 
-def _message_focus(account: AccountRecord) -> str:
-    if account.objective:
-        return account.objective
-    if account.signal and account.number_of_sites:
-        return "booking conversion and repeat visits"
-    if account.signal:
-        return "the current commercial opportunity"
-    if account.number_of_sites:
-        return "commercial consistency across the footprint"
-    return "a practical commercial next step"
+def _format_currency(value: float | int) -> str:
+    amount = float(value)
+    if abs(amount) >= 1_000_000:
+        text = f"${amount / 1_000_000:.2f}".rstrip("0").rstrip(".")
+        return f"{text}m"
+    if abs(amount) >= 1_000:
+        text = f"${amount / 1_000:.1f}".rstrip("0").rstrip(".")
+        return f"{text}k"
+    if amount.is_integer():
+        return f"${int(amount)}"
+    return f"${amount:.2f}"
 
 
 def _site_phrase(account: AccountRecord) -> str:
@@ -69,62 +67,118 @@ def _site_phrase(account: AccountRecord) -> str:
         return "a single-site footprint"
     if account.number_of_sites is None:
         return "a footprint"
-    article = "an" if str(account.number_of_sites).startswith(("8", "11", "18")) else "a"
-    return f"{article} {account.number_of_sites}-site footprint"
+    return f"a {account.number_of_sites}-site footprint"
+
+
+def _footprint_label(account: AccountRecord) -> str:
+    if account.number_of_sites == 1:
+        return "single-site footprint"
+    if account.number_of_sites is None:
+        return "commercial footprint"
+    return f"{account.number_of_sites}-site footprint"
+
+
+def _format_average_ticket(account: AccountRecord) -> str:
+    if account.estimated_average_ticket_price is None:
+        return "an unspecified average ticket"
+    return f"{_format_currency(account.estimated_average_ticket_price)} average ticket"
+
+
+def _outreach_levers(account: AccountRecord) -> str:
+    role = (account.contact_role or "").lower()
+    category = (account.category or "").lower()
+    sub_category = (account.sub_category or "").lower()
+    if "partnership" in role:
+        return "booking conversion, repeat visits and private-hire enquiries"
+    if any(term in role for term in {"sales", "commercial", "revenue", "growth"}):
+        return "booking conversion, repeat visits and upsell"
+    if "operations" in role:
+        return "booking flow, handoffs and service consistency"
+    if "finance" in role:
+        return "yield, margin and revenue quality"
+    if "competitive socialising" in category or any(term in sub_category for term in {"arcade", "mini golf", "darts", "bowling", "escape", "kart", "golf"}):
+        return "booking conversion, repeat visits and private-hire enquiries"
+    if account.objective:
+        return account.objective
+    return "booking conversion and repeat visits"
+
+
+def _value_props(account: AccountRecord) -> list[str]:
+    props: list[str] = []
+    if account.number_of_sites:
+        props.append(f"{account.number_of_sites}-site footprint creates a clear case for better conversion")
+    if account.estimated_annual_visits:
+        props.append(f"About {_format_quantity(account.estimated_annual_visits)} annual visits means small gains matter")
+    if account.estimated_transaction_volume:
+        props.append(f"Estimated transaction volume of {_format_currency(account.estimated_transaction_volume)} gives the account enough scale to test")
+    if account.objective:
+        props.append(f"First conversation should align to the stated objective: {account.objective}")
+    if account.signal:
+        props.append(f"Current signal to reference: {account.signal}")
+    if not props and account.description:
+        props.append(f"Operating model from the source data: {account.description}")
+    if not props:
+        props.append("Open a practical commercial conversation grounded in the source data")
+    return props[:3]
 
 
 def _business_insight(account: AccountRecord) -> str:
     location = account.hq_location or account.region or "the account's market"
-    if account.number_of_sites and account.objective:
-        site_phrase = _site_phrase(account)
+    site_phrase = _site_phrase(account)
+    levers = _outreach_levers(account)
+    if account.estimated_annual_visits and account.estimated_transaction_volume:
         return (
-            f"{account.company_name} has {site_phrase} in {location}, "
-            f"so the first message should stay focused on {account.objective} and avoid broad feature claims."
+            f"{account.company_name} has {site_phrase} in {location}, with about {_format_quantity(account.estimated_annual_visits)} annual visits "
+            f"and roughly {_format_currency(account.estimated_transaction_volume)} in transaction volume, so {levers} are worth a closer look."
+        )
+    if account.estimated_annual_visits:
+        return (
+            f"{account.company_name} has {site_phrase} in {location} and about {_format_quantity(account.estimated_annual_visits)} annual visits, "
+            f"so {levers} are worth a closer look."
         )
     if account.signal:
-        return (
-            f"{account.company_name} has a clear current signal in {location}, so the outreach should stay tied to that trigger."
-        )
-    return f"The account has enough commercial context to justify a short, practical first-touch message in {location}."
+        return f"{account.company_name} has {site_phrase} in {location} and a clear current signal, so the outreach should stay tied to that trigger."
+    return f"{account.company_name} has enough commercial context in {location} to justify a short, practical first-touch message."
 
 
 def _estimated_impact(account: AccountRecord) -> str:
     visits = account.estimated_annual_visits
+    transaction_volume = account.estimated_transaction_volume
     revenue = account.estimated_annual_revenue
-    if visits and revenue:
+    if visits and transaction_volume:
         uplift_visits = max(1, round(visits * 0.05))
-        uplift_revenue = max(1, round(revenue * 0.05))
+        uplift_volume = max(1, round(transaction_volume * 0.05))
         return (
-            f"A modest 5% uplift from the current base would be roughly {uplift_visits:,} additional annual visits "
-            f"or about {uplift_revenue:,.0f} in annual revenue, depending on the lever."
+            f"A 25% uplift in conversion on a narrow journey would be a strong upside case. "
+            f"Conservatively, a 5% lift from { _format_quantity(visits) } annual visits is about {uplift_visits:,} additional visits, "
+            f"and a 5% lift on {_format_currency(transaction_volume)} in transaction volume is about {_format_currency(uplift_volume)}."
+        )
+    if visits:
+        uplift_visits = max(1, round(visits * 0.05))
+        return (
+            "A 25% uplift in conversion on a narrow journey would be a strong upside case. "
+            f"Conservatively, a 5% lift from {_format_quantity(visits)} annual visits is about {uplift_visits:,} additional visits."
+        )
+    if transaction_volume:
+        uplift_volume = max(1, round(transaction_volume * 0.05))
+        return (
+            "A 25% uplift in conversion on a narrow journey would be a strong upside case. "
+            f"Conservatively, a 5% lift on {_format_currency(transaction_volume)} in transaction volume is about {_format_currency(uplift_volume)}."
         )
     if revenue:
         uplift_revenue = max(1, round(revenue * 0.05))
-        return f"A modest 5% uplift could mean about {uplift_revenue:,.0f} in annual revenue."
-    if visits:
-        uplift_visits = max(1, round(visits * 0.05))
-        return f"A modest 5% uplift could mean about {uplift_visits:,} additional annual visits."
-    return "A small uplift in conversion or repeat visits would likely justify a follow-up commercial conversation."
-
-
-def _format_currency(value: float | int) -> str:
-    amount = float(value)
-    if abs(amount) >= 1_000_000:
-        text = f"£{amount / 1_000_000:.2f}".rstrip("0").rstrip(".")
-        return f"{text}m"
-    if abs(amount) >= 1_000:
-        text = f"£{amount / 1_000:.1f}".rstrip("0").rstrip(".")
-        return f"{text}k"
-    if amount.is_integer():
-        return f"£{int(amount)}"
-    return f"£{amount:.2f}"
+        return (
+            "A 25% uplift in conversion on a narrow journey would be a strong upside case. "
+            f"Conservatively, a 5% lift on {_format_currency(revenue)} in annual revenue is about {_format_currency(uplift_revenue)}."
+        )
+    return "A 25% uplift in conversion on a narrow journey would be a strong upside case, but the source data is too thin for a conservative estimate."
 
 
 def _tone_opening(tone: str) -> str:
     return {
-        "concise": "Saw a few signals that made this worth a note.",
-        "warm": "Noticed a few signals that felt relevant.",
-        "direct": "Reaching out because this looks like a practical fit.",
+        "concise": "Worth a quick look.",
+        "warm": "Worth a closer look.",
+        "direct": "Worth a direct look.",
     }[tone]
 
 
@@ -136,58 +190,49 @@ def _channel_suffix(channel: str) -> str:
 
 
 def _opening_sentence(account: AccountRecord, tone: str) -> str:
-    signal = (account.signal or "").lower()
-    if "opening" in signal or "open" in signal:
+    if account.objective:
         return {
-            "concise": f"{account.company_name} is opening a new venue soon.",
-            "warm": f"{account.company_name} is opening a new venue soon, and the launch window looks worth a closer look.",
-            "direct": f"{account.company_name} is opening a new venue soon, so now is the right time to focus on launch demand.",
+            "concise": f"{account.company_name} has a current focus on {account.objective} that looks commercially relevant.",
+            "warm": f"{account.company_name} has a current focus on {account.objective} that looks commercially relevant for the next conversation.",
+            "direct": f"{account.company_name} has a current focus on {account.objective} that looks commercially relevant for the next step.",
         }[tone]
-    if "retention" in signal:
+
+    levers = _outreach_levers(account)
+    if account.estimated_annual_visits and account.estimated_transaction_volume:
         return {
-            "concise": f"{account.company_name} is already running a retention campaign.",
-            "warm": f"{account.company_name} is already running a retention campaign, which makes repeat visits and off-peak demand the right focus.",
-            "direct": f"{account.company_name} is already running a retention campaign, so repeat visits and off-peak demand look like the right commercial angle.",
+            "concise": f"{account.company_name} has a {_footprint_label(account)} and group-friendly format that make {levers} the obvious levers.",
+            "warm": f"{account.company_name} has a {_footprint_label(account)} and group-friendly format that make {levers} the obvious levers to focus on.",
+            "direct": f"{account.company_name} has a {_footprint_label(account)} and group-friendly format that make {levers} the obvious levers to tighten.",
         }[tone]
-    if "corporate events" in signal:
+    if account.estimated_annual_visits:
         return {
-            "concise": f"{account.company_name} has recently expanded its corporate events team.",
-            "warm": f"{account.company_name} has recently expanded its corporate events team, which puts weekday group bookings in focus.",
-            "direct": f"{account.company_name} has recently expanded its corporate events team, so weekday group bookings look like the immediate commercial angle.",
-        }[tone]
-    if "group bookings" in signal:
-        return {
-            "concise": f"{account.company_name} is seeing stronger interest in group bookings.",
-            "warm": f"{account.company_name} is seeing stronger interest in group bookings, which makes weekday demand worth a closer look.",
-            "direct": f"{account.company_name} is seeing stronger interest in group bookings, so weekday demand looks like the immediate angle.",
-        }[tone]
-    if account.signal:
-        return {
-            "concise": f"{account.company_name} has a clear current signal: {account.signal}.",
-            "warm": f"{account.company_name} has a clear current signal in play: {account.signal}.",
-            "direct": f"{account.company_name} has a clear current signal: {account.signal}.",
+            "concise": f"{account.company_name} has a {_footprint_label(account)} and visit volume that make {levers} the obvious levers.",
+            "warm": f"{account.company_name} has a {_footprint_label(account)} and visit volume that make {levers} the obvious levers to focus on.",
+            "direct": f"{account.company_name} has a {_footprint_label(account)} and visit volume that make {levers} the obvious levers to tighten.",
         }[tone]
     return {
-        "concise": f"{account.company_name} is moving through a practical growth phase.",
-        "warm": f"{account.company_name} is moving through a practical growth phase, which makes a short, relevant first touch sensible.",
-        "direct": f"{account.company_name} is moving through a practical growth phase, so a short commercial first touch makes sense.",
+        "concise": f"{account.company_name} has a commercial profile that makes {levers} the obvious levers.",
+        "warm": f"{account.company_name} has a commercial profile that makes {levers} the obvious levers to focus on.",
+        "direct": f"{account.company_name} has a commercial profile that makes {levers} the obvious levers to tighten.",
     }[tone]
 
 
 def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
     greeting = account.contact_name.split()[0] if account.contact_name else "there"
     opening = _opening_sentence(account, tone)
-    focus = account.objective or _message_focus(account)
-    if account.number_of_sites:
-        site_line = f"For {_site_phrase(account)}, "
-    else:
-        site_line = "For teams like yours, "
-    message = (
-        f"Hi {greeting}, {opening} "
-        f"{site_line}{focus} should stay the commercial focus. "
-        f"A cleaner workflow can help the team keep outreach and follow-up aligned without extra admin. "
-        f"Worth a quick look at how to help {focus}?"
-    )
+    metrics: list[str] = []
+    if account.estimated_annual_visits is not None:
+        metrics.append(f"roughly {_format_quantity(account.estimated_annual_visits)} annual visits")
+    if account.estimated_average_ticket_price is not None:
+        metrics.append(f"a {_format_currency(account.estimated_average_ticket_price)} average ticket")
+    if account.estimated_transaction_volume is not None:
+        metrics.append(f"about {_format_currency(account.estimated_transaction_volume)} in transaction volume")
+    if account.estimated_annual_revenue is not None:
+        metrics.append(f"about {_format_currency(account.estimated_annual_revenue)} in annual revenue")
+    metric_text = ", ".join(metrics[:3])
+    role_prefix = f"As {account.contact_role}, " if account.contact_role else ""
+    metric_clause = f" With {metric_text}, even small improvements in conversion or upsell could be meaningful." if metric_text else " Even small improvements in conversion or upsell could be meaningful."
+    message = f"Hi {greeting}, {role_prefix}{opening}{metric_clause} Worth a quick look at where the booking and group-sales journey could be tightened?"
     words = message.split()
     if len(words) > 100:
         message = " ".join(words[:100])
@@ -296,7 +341,7 @@ def _company_overview_lines(account: AccountRecord) -> list[str]:
     site_count = (
         f"{account.number_of_sites} site" if account.number_of_sites == 1 else f"{account.number_of_sites} sites"
     ) if account.number_of_sites is not None else "not provided"
-    visits = f"{account.estimated_annual_visits:,}" if account.estimated_annual_visits is not None else "not provided"
+    visits = _format_quantity(account.estimated_annual_visits) if account.estimated_annual_visits is not None else "not provided"
     ticket = _format_currency(account.estimated_average_ticket_price) if account.estimated_average_ticket_price is not None else "not provided"
     revenue = _format_currency(account.estimated_annual_revenue) if account.estimated_annual_revenue is not None else "not provided"
     lines = [
@@ -315,24 +360,28 @@ def _opportunity_areas(account: AccountRecord, focus: str) -> list[str]:
     if focus in {"commercial", "growth"}:
         areas.extend([
             "conversion improvement",
-            "average transaction value / upsell",
+            "repeat visits and upsell",
         ])
     elif focus == "operations":
         areas.extend([
-            "cost and complexity reduction",
+            "booking flow and handoff clarity",
             "reporting consistency",
         ])
     elif focus == "customer_support":
         areas.extend([
-            "AI customer support",
-            "cost and complexity reduction",
+            "booking support and response speed",
+            "customer support load reduction",
         ])
 
-    if account.signal:
-        areas.append("AI sales agent for group/corporate enquiries")
+    if account.contact_role and "partnership" in account.contact_role.lower():
+        areas.append("group-sales follow-up")
+    if account.estimated_transaction_volume is not None:
+        areas.append("transaction value uplift")
+    if account.estimated_annual_visits is not None:
+        areas.append("conversion improvement")
     if account.objective and "support" in account.objective.lower():
-        areas.append("AI customer support")
-    if account.objective and any(term in account.objective.lower() for term in {"book", "booking", "conversion", "grow", "revenue"}):
+        areas.append("customer support load reduction")
+    if account.objective and any(term in account.objective.lower() for term in {"book", "booking", "conversion", "grow", "revenue", "membership"}):
         areas.append("conversion improvement")
 
     deduped: list[str] = []
@@ -344,14 +393,38 @@ def _opportunity_areas(account: AccountRecord, focus: str) -> list[str]:
 
 def _opportunity_summary(account: AccountRecord, meeting_persona: str | None, focus: str) -> str:
     persona = _briefing_persona(account, meeting_persona)
-    areas = _opportunity_areas(account, focus)
-    signal = account.signal or "the current account profile"
-    objective = account.objective or "a practical commercial next step"
-    area_text = ", ".join(areas) if areas else "conversion improvement and operational simplification"
+    levers = _outreach_levers(account)
+    site_phrase = _site_phrase(account)
+    if account.objective:
+        return (
+            f"For a {persona}, the cleanest angle is to keep the conversation on {account.objective} across {site_phrase}. "
+            f"The data points to {levers}, so the first meeting should stay close to one real workflow or enquiry path."
+        )
     return (
-        f"For a {persona}, the clearest angle is to connect {signal} to {objective}. "
-        f"The discussion should stay centred on {area_text}, because that is where the quickest commercial win is most likely to show up. "
-        f"A short review of one real workflow or enquiry path is usually enough to judge value without broad platform claims."
+        f"For a {persona}, the cleanest angle is to improve {levers} across {site_phrase}. "
+        f"The data points to one practical workflow or enquiry path that can be reviewed without broad platform claims."
+    )
+
+
+def _opportunity_analysis(account: AccountRecord, meeting_persona: str | None, focus: str) -> str:
+    persona = _briefing_persona(account, meeting_persona)
+    areas = _opportunity_areas(account, focus)
+    area_text = ", ".join(areas) if areas else "conversion improvement and operational simplification"
+    levers = _outreach_levers(account)
+    if account.estimated_annual_visits and account.estimated_transaction_volume:
+        return (
+            f"For a {persona}, the practical angle is to tighten {levers} without adding more process overhead. "
+            f"With { _format_quantity(account.estimated_annual_visits) } annual visits and roughly {_format_currency(account.estimated_transaction_volume)} in transaction volume, "
+            f"the opportunity is most likely to show up in {area_text}."
+        )
+    if account.estimated_annual_visits:
+        return (
+            f"For a {persona}, the practical angle is to tighten {levers} without adding more process overhead. "
+            f"With { _format_quantity(account.estimated_annual_visits) } annual visits, the opportunity is most likely to show up in {area_text}."
+        )
+    return (
+        f"For a {persona}, the practical angle is to tighten {levers} without adding more process overhead. "
+        f"The opportunity is most likely to show up in {area_text}."
     )
 
 
@@ -361,37 +434,35 @@ def _quantified_value_case(account: AccountRecord) -> str:
         upside_visits = max(1, round(account.estimated_annual_visits * 0.05))
         upside_revenue = max(1, round(account.estimated_annual_revenue * 0.05))
         parts.append(
-            f"5% visit/revenue upside scenario: roughly {upside_visits:,} additional annual visits or about {_format_currency(upside_revenue)} in annual revenue. "
+            f"25% conversion uplift value proposition: a meaningful improvement on one high-intent journey would be the upside case. "
+            f"Conservatively, a 5% visit uplift would be roughly {upside_visits:,} additional annual visits, and a 5% revenue uplift would be about {_format_currency(upside_revenue)} in annual revenue. "
             "These are directional estimates based only on the account data."
         )
     elif account.estimated_annual_visits is not None:
         upside_visits = max(1, round(account.estimated_annual_visits * 0.05))
         parts.append(
-            f"5% visit upside scenario: roughly {upside_visits:,} additional annual visits. This is a directional estimate based only on the account data."
+            f"25% conversion uplift value proposition: a meaningful improvement on one high-intent journey would be the upside case. "
+            f"Conservatively, a 5% visit uplift would be roughly {upside_visits:,} additional annual visits. This is a directional estimate based only on the account data."
         )
     elif account.estimated_annual_revenue is not None:
         upside_revenue = max(1, round(account.estimated_annual_revenue * 0.05))
         parts.append(
-            f"5% revenue upside scenario: about {_format_currency(upside_revenue)} in annual revenue. This is a directional estimate based only on the account data."
+            f"25% conversion uplift value proposition: a meaningful improvement on one high-intent journey would be the upside case. "
+            f"Conservatively, a 5% revenue uplift would be about {_format_currency(upside_revenue)} in annual revenue. This is a directional estimate based only on the account data."
         )
     else:
-        parts.append("5% visit/revenue upside scenario: not enough data to calculate a directional estimate from the account record.")
+        parts.append("25% conversion uplift value proposition: not enough data to calculate a directional estimate from the account record.")
 
-    if account.estimated_transaction_volume is not None and account.estimated_average_ticket_price is not None:
-        uplift_per_transaction = account.estimated_average_ticket_price * 0.08
-        annual_uplift = account.estimated_transaction_volume * uplift_per_transaction
+    if account.estimated_transaction_volume is not None:
+        upside_transaction_volume = max(1, round(account.estimated_transaction_volume * 0.05))
         parts.append(
-            f"8% transaction value uplift scenario: about {_format_currency(uplift_per_transaction)} more per transaction, which would be roughly {_format_currency(annual_uplift)} annually if applied across the estimated transaction volume. "
-            "This is a directional estimate based only on the account data."
+            f"Transaction volume context: a 5% uplift on {_format_currency(account.estimated_transaction_volume)} would be about {_format_currency(upside_transaction_volume)} annually. "
+            "This remains a directional estimate based only on the account data."
         )
-    elif account.estimated_average_ticket_price is not None:
-        uplift_per_transaction = account.estimated_average_ticket_price * 0.08
+    if account.estimated_average_ticket_price is not None:
         parts.append(
-            f"8% transaction value uplift scenario: about {_format_currency(uplift_per_transaction)} more per transaction. "
-            "The annual effect cannot be calculated cleanly because transaction volume is missing."
+            f"Average ticket context: {_format_currency(account.estimated_average_ticket_price)} per sale gives enough headroom to test upsell or conversion improvements without changing the core offer."
         )
-    else:
-        parts.append("8% transaction value uplift scenario: not enough pricing data to calculate a directional estimate.")
 
     return " ".join(parts)
 
@@ -399,16 +470,19 @@ def _quantified_value_case(account: AccountRecord) -> str:
 def _suggested_questions(account: AccountRecord, focus: str) -> list[str]:
     questions = [
         f"What is driving the focus on {account.objective or 'the next commercial step'}?",
-        "Where is the team losing the most value today: conversion, upsell, support, or reporting?",
-        "Which enquiry, booking, or support step still needs manual follow-up?",
-        "What would a small test need to prove before anyone would scale it?",
+        "Where are high-intent enquiries dropping out today?",
+        "Which step still relies on manual follow-up or chasing?",
+        "If conversion improved by 25% on one journey, what would the team expect to see first?",
     ]
     if focus == "customer_support":
         questions[1] = "Where do customers need the most help today: booking, pre-visit questions, or post-visit support?"
+        questions[2] = "Which support step still needs the most manual follow-up?"
     elif focus == "operations":
         questions[1] = "Where do manual handoffs or reporting gaps create the most friction?"
+        questions[2] = "Which handoff still feels slow or error-prone?"
     elif focus == "growth":
         questions[1] = "Which part of the commercial funnel needs the most help: discovery, conversion, or repeat visits?"
+        questions[2] = "What would a better conversion path need to prove before anyone scaled it?"
     return questions
 
 
@@ -468,7 +542,7 @@ def _briefing_markdown(account: AccountRecord, meeting_persona: str | None, focu
             persona_block,
             "",
             "## 3. Opportunity Analysis",
-            _opportunity_summary(account, meeting_persona, focus),
+            _opportunity_analysis(account, meeting_persona, focus),
             "",
             "## 4. Quantified Value Case",
             _quantified_value_case(account),

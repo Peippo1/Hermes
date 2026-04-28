@@ -4,6 +4,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
+from app.agents import build_briefing_markdown
+from app.models import AccountRecord
 from tests.test_support import load_test_app_module
 
 
@@ -71,6 +73,33 @@ class BriefingEndpointTests(unittest.TestCase):
         ]
         for name in forbidden_names:
             self.assertNotIn(name, markdown)
+
+    def test_generate_briefing_uses_richer_metrics(self) -> None:
+        account = AccountRecord(
+            account_id="NQ64",
+            company_name="NQ64",
+            category="Competitive Socialising",
+            sub_category="Arcade Bar",
+            description="Retro arcade bar with classic games and craft drinks",
+            hq_location="Manchester",
+            number_of_sites=10,
+            estimated_annual_visits=1500000,
+            estimated_average_ticket_price=8,
+            estimated_transaction_volume=12000000,
+            estimated_annual_revenue=420000,
+            region="UK",
+            contact_name="James Palmer",
+            contact_role="Head of Partnerships",
+        )
+
+        note = build_briefing_markdown(account, focus="commercial")
+
+        self.assertIn("For a Head of Partnerships", note.briefing_markdown)
+        self.assertIn("10 sites", note.briefing_markdown)
+        self.assertIn("1.5m annual visits", note.briefing_markdown)
+        self.assertIn("$12m", note.briefing_markdown)
+        self.assertIn("25% conversion uplift value proposition", note.quantified_value_case)
+        self.assertNotIn("For a Competitive Socialising lead", note.briefing_markdown)
 
 
 if __name__ == "__main__":
