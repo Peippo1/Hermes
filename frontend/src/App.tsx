@@ -259,8 +259,14 @@ function fallbackMessage(kind: 'backend-unavailable' | 'request-failed'): string
     : 'Request failed. Using mock mode.';
 }
 
-function actionLabel(label: string, loading: boolean): string {
-  return loading ? `${label}...` : label;
+function actionLabel(kind: keyof ActionLoadingState): string {
+  return {
+    outreach: 'Generating outreach…',
+    briefing: 'Generating briefing…',
+    queue: 'Adding to queue…',
+    export: 'Exporting examples…',
+    queueView: 'Viewing queue…'
+  }[kind];
 }
 
 export default function App() {
@@ -678,25 +684,25 @@ export default function App() {
 
           <div className="button-row actions">
             <button type="button" className="primary-button" onClick={handleGenerateOutreach} disabled={loading.outreach}>
-              {actionLabel('Generate Outreach', loading.outreach)}
+              {loading.outreach ? actionLabel('outreach') : 'Generate Outreach'}
             </button>
             <button type="button" className="secondary-button" onClick={handleGenerateBriefing} disabled={loading.briefing}>
-              {actionLabel('Generate Briefing', loading.briefing)}
+              {loading.briefing ? actionLabel('briefing') : 'Generate Briefing'}
             </button>
             <button type="button" className="outline-button" onClick={handleQueueOutreach} disabled={loading.queue}>
-              {actionLabel('Add to Mock Queue', loading.queue)}
+              {loading.queue ? actionLabel('queue') : 'Add to Mock Queue'}
             </button>
             <button type="button" className="ghost-button" onClick={handleViewQueue} disabled={loading.queueView}>
-              {actionLabel('View Queue', loading.queueView)}
+              {loading.queueView ? actionLabel('queueView') : 'View Queue'}
             </button>
             <button type="button" className="ghost-button" onClick={handleExportExamples} disabled={loading.export}>
-              {actionLabel('Export Examples', loading.export)}
+              {loading.export ? actionLabel('export') : 'Export Examples'}
             </button>
           </div>
         </section>
 
         <section className="content-stack">
-          <article className="card panel section-card">
+          <article className={`card panel section-card ${outreach ? 'output-card-fade-in' : ''}`}>
             <div className="section-header">
               <div>
                 <p className="card-kicker">Account / workflow</p>
@@ -778,7 +784,7 @@ export default function App() {
             )}
           </article>
 
-          <article className="card panel section-card">
+          <article className={`card panel section-card ${briefing ? 'output-card-fade-in' : ''}`}>
             <div className="section-header">
               <div>
                 <p className="card-kicker">Outreach</p>
@@ -895,7 +901,7 @@ export default function App() {
                 </table>
               </div>
             ) : (
-              <p className="empty-state">Add a draft to the mock queue to show review state.</p>
+              <p className="empty-state">No queued drafts yet. Add a draft to simulate the outbound review workflow.</p>
             )}
           </article>
 
@@ -936,7 +942,7 @@ export default function App() {
                 </ul>
               </div>
             ) : (
-              <p className="empty-state">Export examples to generate a review bundle.</p>
+              <p className="empty-state">No exports generated yet. Run Export Examples to create demo artifacts.</p>
             )}
           </article>
         </section>

@@ -349,6 +349,21 @@ code {
   color: var(--text);
 }
 
+.output-card-fade-in {
+  animation: outputFadeIn 220ms ease-out both;
+}
+
+@keyframes outputFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .status-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
