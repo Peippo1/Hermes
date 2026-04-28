@@ -625,7 +625,7 @@ export default function App() {
         </header>
 
         <section className="control-bar panel">
-            <div className="control-grid">
+          <div className="control-top">
             <div className="field field-account">
               <label htmlFor="account">Account selector</label>
               <select
@@ -639,83 +639,72 @@ export default function App() {
                   </option>
                 ))}
               </select>
-              <p className="field-help">Adjust tone and focus before generating outputs.</p>
             </div>
-            <div className="control-stack">
-              <div className="control-row">
-                <div className="field field-channel">
-                  <label htmlFor="channel">Channel</label>
-                  <select id="channel" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value as Channel)}>
-                    <option value="email">Email</option>
-                    <option value="linkedin">LinkedIn</option>
-                  </select>
-                </div>
-                <div className="field field-tone">
-                  <label htmlFor="tone">Tone</label>
-                  <select id="tone" value={selectedTone} onChange={(event) => setSelectedTone(event.target.value as Tone)}>
-                    <option value="concise">Concise</option>
-                    <option value="warm">Warm</option>
-                    <option value="direct">Direct</option>
-                  </select>
-                </div>
-                <div className="field field-focus">
-                  <label htmlFor="focus">Briefing focus</label>
-                  <select
-                    id="focus"
-                    value={selectedFocus}
-                    onChange={(event) => setSelectedFocus(event.target.value as BriefingFocus)}
-                  >
-                    <option value="commercial">Commercial</option>
-                    <option value="operations">Operations</option>
-                    <option value="growth">Growth</option>
-                    <option value="customer_support">Customer support</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="workflow-steps" aria-label="Workflow steps">
-              <span className="workflow-step">1. Select account</span>
-              <span className="workflow-step">2. Generate outputs</span>
-              <span className="workflow-step">3. Review outputs</span>
-              <span className="workflow-step">4. Queue &amp; export</span>
-            </div>
-            <p className="control-helper">
-              Adjust the account, channel, tone and briefing focus before generating outputs.
-            </p>
             <div className="status-panel panel">
               <div>
                 <span className="label">Mode</span>
-                <p>{mode === 'api' ? 'Real API mode' : 'Mock fallback mode'}</p>
+                <p>{mode === 'api' ? 'Real API mode' : 'Mock mode'}</p>
+              </div>
+              <div>
+                <span className="label">Data source</span>
+                <p>{dataSourceInfo ? `${dataSourceInfo.data_source === 'google_sheet'
+                  ? 'Google Sheet'
+                  : dataSourceInfo.data_source === 'local_file'
+                    ? 'Local file'
+                    : 'Sample fallback'}` : 'Loading...'}</p>
               </div>
               <div>
                 <span className="label">Queue</span>
                 <p>{queueSize} items</p>
               </div>
-              <div>
-                <span className="label">Data source</span>
-                <p>
-                  {dataSourceInfo
-                    ? `${dataSourceInfo.data_source === 'google_sheet'
-                      ? 'Google Sheet'
-                      : dataSourceInfo.data_source === 'local_file'
-                        ? 'Local file'
-                        : 'Sample fallback'} · ${dataSourceInfo.data_source_detail}`
-                    : 'Loading...'}
-                </p>
-              </div>
-              {dataSourceInfo?.data_load_warning ? (
-                <div className="status-note">{dataSourceInfo.data_load_warning}</div>
-              ) : null}
               <div className="status-note">Mock queue only — no external messages are sent.</div>
               <details className="technical-details">
                 <summary>Technical details</summary>
                 <div className="technical-details-body">
                   <span className="label">API base URL</span>
                   <p className="subtle-value">{apiBaseUrl}</p>
+                  {dataSourceInfo ? (
+                    <p className="subtle-value">{dataSourceInfo.data_source_detail}</p>
+                  ) : null}
                 </div>
               </details>
             </div>
           </div>
+
+          <div className="control-row">
+            <div className="field field-channel">
+              <label htmlFor="channel">Channel</label>
+              <select id="channel" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value as Channel)}>
+                <option value="email">Email</option>
+                <option value="linkedin">LinkedIn</option>
+              </select>
+            </div>
+            <div className="field field-tone">
+              <label htmlFor="tone">Tone</label>
+              <select id="tone" value={selectedTone} onChange={(event) => setSelectedTone(event.target.value as Tone)}>
+                <option value="concise">Concise</option>
+                <option value="warm">Warm</option>
+                <option value="direct">Direct</option>
+              </select>
+            </div>
+            <div className="field field-focus">
+              <label htmlFor="focus">Briefing focus</label>
+              <select
+                id="focus"
+                value={selectedFocus}
+                onChange={(event) => setSelectedFocus(event.target.value as BriefingFocus)}
+              >
+                <option value="commercial">Commercial</option>
+                <option value="operations">Operations</option>
+                <option value="growth">Growth</option>
+                <option value="customer_support">Customer support</option>
+              </select>
+            </div>
+          </div>
+
+          <p className="control-helper">
+            Select an account, adjust the channel and briefing focus, then generate review-ready outputs.
+          </p>
 
           {connectionAlert ? <div className="error-banner">{connectionAlert}</div> : null}
           {actionError ? <div className="error-banner">{actionError}</div> : null}
