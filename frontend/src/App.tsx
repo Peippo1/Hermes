@@ -123,6 +123,7 @@ function renderBriefingMarkdown(markdown: string): JSX.Element[] {
   const lines = markdown.split('\n');
   let paragraph: string[] = [];
   let listItems: string[] = [];
+  let objection: { objection: string; response: string } | null = null;
 
   function flushParagraph() {
     if (paragraph.length === 0) return;
@@ -146,9 +147,27 @@ function renderBriefingMarkdown(markdown: string): JSX.Element[] {
     listItems = [];
   }
 
+  function flushObjection() {
+    if (!objection) return;
+    blocks.push(
+      <div key={`objection-${blocks.length}`} className="objection-block">
+        <div className="objection-line">
+          <span className="briefing-label">Objection:</span>
+          <span>{objection.objection}</span>
+        </div>
+        <div className="response-line">
+          <span className="briefing-label">Response:</span>
+          <span>{objection.response}</span>
+        </div>
+      </div>
+    );
+    objection = null;
+  }
+
   function flush() {
     flushParagraph();
     flushList();
+    flushObjection();
   }
 
   for (const rawLine of lines) {
@@ -171,19 +190,35 @@ function renderBriefingMarkdown(markdown: string): JSX.Element[] {
       continue;
     }
 
-    if (line.startsWith('- ')) {
+    if (line.startsWith('Objection:') || line.startsWith('- Objection:')) {
       flushParagraph();
-      listItems.push(line.slice(2).trim());
+      flushList();
+      flushObjection();
+      objection = {
+        objection: line.replace(/^- /, '').replace(/^Objection:\s*/, ''),
+        response: ''
+      };
       continue;
     }
 
-    if (line.startsWith('Objection:')) {
+    if (line.startsWith('Response:') && objection) {
+      objection.response = line.replace(/^Response:\s*/, '');
+      continue;
+    }
+
+    if (objection) {
+      if (!objection.response) {
+        objection.response = line;
+        continue;
+      }
+      flushObjection();
+      paragraph.push(line);
+      continue;
+    }
+
+    if (line.startsWith('- ')) {
       flushParagraph();
-      blocks.push(
-        <p key={`p-${blocks.length}`} className="briefing-paragraph">
-          {line}
-        </p>
-      );
+      listItems.push(line.slice(2).trim());
       continue;
     }
 
@@ -261,6 +296,12 @@ export default function App() {
 
   function setLoadingFlag(key: keyof ActionLoadingState, value: boolean) {
     setLoading((current) => ({ ...current, [key]: value }));
+  }
+
+  function clearLocalQueueView() {
+    setActionError(null);
+    setQueue([]);
+    setQueueSize(0);
   }
 
   function switchToMock(
@@ -393,7 +434,7 @@ export default function App() {
           channel: selectedChannel,
           tone: selectedTone
         });
-        setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
+        setQueue((current) => [item, ...current]);
         setQueueSize((current) => current + 1);
         if (!outreach) {
           setOutreach(generateMockOutreach(selectedAccount, {
@@ -409,7 +450,7 @@ export default function App() {
         channel: selectedChannel,
         tone: selectedTone
       });
-      setQueue((current) => [response.item, ...current.filter((entry) => entry.queue_id !== response.item.queue_id)]);
+      setQueue((current) => [response.item, ...current]);
       setQueueSize(response.queue_size);
       if (!outreach) {
         setOutreach(await generateOutreach({
@@ -427,7 +468,7 @@ export default function App() {
         channel: selectedChannel,
         tone: selectedTone
       });
-      setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
+      setQueue((current) => [item, ...current]);
       setQueueSize((current) => current + 1);
       if (!outreach) {
         setOutreach(generateMockOutreach(selectedAccount, {
@@ -475,7 +516,7 @@ export default function App() {
         const exportBundle = buildMockExport(selectedAccount);
         setOutreach(exportBundle.outreach);
         setBriefing(exportBundle.briefing);
-        setQueue((current) => [exportBundle.queueItem, ...current.filter((entry) => entry.account_id !== exportBundle.queueItem.account_id)]);
+        setQueue((current) => [exportBundle.queueItem, ...current]);
         setArtifacts(buildMockArtifacts());
         return;
       }
@@ -491,7 +532,7 @@ export default function App() {
       const exportBundle = buildMockExport(selectedAccount);
       setOutreach(exportBundle.outreach);
       setBriefing(exportBundle.briefing);
-      setQueue((current) => [exportBundle.queueItem, ...current.filter((entry) => entry.account_id !== exportBundle.queueItem.account_id)]);
+      setQueue((current) => [exportBundle.queueItem, ...current]);
       setArtifacts(buildMockArtifacts());
     } finally {
       setLoadingFlag('export', false);
@@ -526,8 +567,8 @@ export default function App() {
         </header>
 
         <section className="control-bar panel">
-          <div className="control-grid">
-            <div className="field">
+            <div className="control-grid">
+            <div className="field field-account">
               <label htmlFor="account">Account selector</label>
               <select
                 id="account"
@@ -544,14 +585,14 @@ export default function App() {
             </div>
             <div className="control-stack">
               <div className="control-row">
-                <div className="field">
+                <div className="field field-channel">
                   <label htmlFor="channel">Channel</label>
                   <select id="channel" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value as Channel)}>
                     <option value="email">Email</option>
                     <option value="linkedin">LinkedIn</option>
                   </select>
                 </div>
-                <div className="field">
+                <div className="field field-tone">
                   <label htmlFor="tone">Tone</label>
                   <select id="tone" value={selectedTone} onChange={(event) => setSelectedTone(event.target.value as Tone)}>
                     <option value="concise">Concise</option>
@@ -559,8 +600,8 @@ export default function App() {
                     <option value="direct">Direct</option>
                   </select>
                 </div>
-                <div className="field">
-                  <label htmlFor="focus">Focus / persona</label>
+                <div className="field field-focus">
+                  <label htmlFor="focus">Briefing focus</label>
                   <select
                     id="focus"
                     value={selectedFocus}
@@ -575,10 +616,6 @@ export default function App() {
               </div>
             </div>
             <div className="status-panel panel">
-              <div>
-                <span className="label">API base URL</span>
-                <p className="subtle-value">{apiBaseUrl}</p>
-              </div>
               <div>
                 <span className="label">Mode</span>
                 <p>{mode === 'api' ? 'Real API mode' : 'Mock fallback mode'}</p>
@@ -603,6 +640,13 @@ export default function App() {
                 <div className="status-note">{dataSourceInfo.data_load_warning}</div>
               ) : null}
               <div className="status-note">Mock queue only — no external messages are sent.</div>
+              <details className="technical-details">
+                <summary>Technical details</summary>
+                <div className="technical-details-body">
+                  <span className="label">API base URL</span>
+                  <p className="subtle-value">{apiBaseUrl}</p>
+                </div>
+              </details>
             </div>
           </div>
 
@@ -787,12 +831,17 @@ export default function App() {
                 <p className="card-kicker">Queue</p>
                 <h2>Mock outbound queue</h2>
               </div>
-              <div className="mini-stat">
-                <span>Queued items</span>
-                <strong>{queueSize}</strong>
+              <div className="section-header-actions">
+                <div className="mini-stat">
+                  <span>Queued items</span>
+                  <strong>{queueSize}</strong>
+                </div>
+                <button type="button" className="secondary-button" onClick={clearLocalQueueView} disabled={queueSize === 0}>
+                  Clear local view
+                </button>
               </div>
             </div>
-            <div className="quiet-note">Mock queue only — no external messages are sent.</div>
+            <div className="quiet-note">Queued items are review-only drafts; no external delivery is triggered.</div>
             {queue.length > 0 ? (
               <div className="table-wrap queue-table">
                 <table>
@@ -831,29 +880,40 @@ export default function App() {
             <div className="section-header">
               <div>
                 <p className="card-kicker">Exports</p>
-                <h2>Artifact paths</h2>
+                <h2>Generated export bundle</h2>
               </div>
             </div>
             {artifacts ? (
-              <ul className="artifact-list">
-                <li>
-                  <code>{artifacts.outreach_csv_path}</code>
-                </li>
-                <li>
-                  <code>{artifacts.outreach_json_path}</code>
-                </li>
-                <li>
-                  <code>{artifacts.briefing_note_1_path}</code>
-                </li>
-                <li>
-                  <code>{artifacts.briefing_note_2_path}</code>
-                </li>
-                <li>
-                  <code>{artifacts.send_queue_path}</code>
-                </li>
-              </ul>
+              <div className="export-bundle">
+                <div className="export-success">
+                  <strong>Export bundle ready for review.</strong>
+                  <p>Exports are generated server-side for review and demo purposes.</p>
+                </div>
+                <ul className="artifact-list">
+                  <li>
+                    <span>Outreach CSV</span>
+                    <code>outreach_examples.csv</code>
+                  </li>
+                  <li>
+                    <span>Outreach JSON</span>
+                    <code>outreach_examples.json</code>
+                  </li>
+                  <li>
+                    <span>Briefing note 1</span>
+                    <code>briefing_note_1.md</code>
+                  </li>
+                  <li>
+                    <span>Briefing note 2</span>
+                    <code>briefing_note_2.md</code>
+                  </li>
+                  <li>
+                    <span>Queue export</span>
+                    <code>send_queue.json</code>
+                  </li>
+                </ul>
+              </div>
             ) : (
-              <p className="empty-state">Export examples to display artifact paths.</p>
+              <p className="empty-state">Export examples to generate a review bundle.</p>
             )}
           </article>
         </section>

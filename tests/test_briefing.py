@@ -98,6 +98,9 @@ class BriefingEndpointTests(unittest.TestCase):
         self.assertIn("10 sites", note.briefing_markdown)
         self.assertIn("1.5m annual visits", note.briefing_markdown)
         self.assertIn("$12m", note.briefing_markdown)
+        self.assertIn("Objection: We already have a process for this.", note.briefing_markdown)
+        self.assertIn("Response: Acknowledge the current process", note.briefing_markdown)
+        self.assertIn("Use the first call to choose one journey to inspect", note.recommended_next_step)
         self.assertIn("25% conversion uplift value proposition", note.quantified_value_case)
         self.assertNotIn("For a Competitive Socialising lead", note.briefing_markdown)
 

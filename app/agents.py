@@ -230,9 +230,13 @@ def _compose_message(account: AccountRecord, channel: str, tone: str) -> str:
     if account.estimated_annual_revenue is not None:
         metrics.append(f"about {_format_currency(account.estimated_annual_revenue)} in annual revenue")
     metric_text = ", ".join(metrics[:3])
-    role_prefix = f"As {account.contact_role}, " if account.contact_role else ""
     metric_clause = f" With {metric_text}, even small improvements in conversion or upsell could be meaningful." if metric_text else " Even small improvements in conversion or upsell could be meaningful."
-    message = f"Hi {greeting}, {role_prefix}{opening}{metric_clause} Worth a quick look at where the booking and group-sales journey could be tightened?"
+    role_clause = (
+        f" For a {account.contact_role}, the booking and group-sales journey looks like the right place to start."
+        if account.contact_role
+        else ""
+    )
+    message = f"Hi {greeting}, {opening}{metric_clause}{role_clause} Worth a quick look at where the booking and group-sales journey could be tightened?"
     words = message.split()
     if len(words) > 100:
         message = " ".join(words[:100])
@@ -396,14 +400,8 @@ def _opportunity_summary(account: AccountRecord, meeting_persona: str | None, fo
     levers = _outreach_levers(account)
     site_phrase = _site_phrase(account)
     if account.objective:
-        return (
-            f"For a {persona}, the cleanest angle is to keep the conversation on {account.objective} across {site_phrase}. "
-            f"The data points to {levers}, so the first meeting should stay close to one real workflow or enquiry path."
-        )
-    return (
-        f"For a {persona}, the cleanest angle is to improve {levers} across {site_phrase}. "
-        f"The data points to one practical workflow or enquiry path that can be reviewed without broad platform claims."
-    )
+        return f"For a {persona}, keep the discussion on {account.objective} across {site_phrase}. The strongest levers are {levers}."
+    return f"For a {persona}, the best angle is to improve {levers} across {site_phrase}."
 
 
 def _opportunity_analysis(account: AccountRecord, meeting_persona: str | None, focus: str) -> str:
@@ -467,6 +465,23 @@ def _quantified_value_case(account: AccountRecord) -> str:
     return " ".join(parts)
 
 
+def _likely_objection_pairs() -> list[tuple[str, str]]:
+    return [
+        (
+            "We already have a process for this.",
+            "Acknowledge the current process, then ask where the workflow still creates manual effort or lost conversion.",
+        ),
+        (
+            "Timing is not ideal.",
+            "Suggest a short, low-effort review instead of a full implementation discussion.",
+        ),
+        (
+            "We need to avoid adding complexity.",
+            "Position the conversation as one narrow test around a single journey, not a platform replacement.",
+        ),
+    ]
+
+
 def _suggested_questions(account: AccountRecord, focus: str) -> list[str]:
     questions = [
         f"What is driving the focus on {account.objective or 'the next commercial step'}?",
@@ -487,20 +502,7 @@ def _suggested_questions(account: AccountRecord, focus: str) -> list[str]:
 
 
 def _likely_objections() -> list[tuple[str, str]]:
-    return [
-        (
-            "We already have a process for this.",
-            "That is a sensible starting point. The useful question is whether the current process leaves room for a lighter, faster first step.",
-        ),
-        (
-            "Timing is not ideal.",
-            "Fair point. A short review can still show whether there is a low-effort way to test the idea later.",
-        ),
-        (
-            "We need to avoid adding complexity.",
-            "Agreed. The conversation should stay focused on one practical use case and the smallest useful next step.",
-        ),
-    ]
+    return _likely_objection_pairs()
 
 
 def _systems_context() -> str:
@@ -511,11 +513,10 @@ def _systems_context() -> str:
 
 
 def _recommended_next_step(account: AccountRecord, focus: str) -> str:
-    objective = account.objective or "the current commercial priority"
-    focus_value = _focus_label(focus).lower()
+    _ = focus
     return (
-        f"Propose a short follow-up focused on {objective.lower()} and ask for one specific workflow or customer journey to review first. "
-        f"Keep the next step narrow enough to assess {focus_value} value without adding process overhead."
+        "Use the first call to choose one journey to inspect - for example group bookings, private hire, checkout conversion, "
+        "or post-visit upsell - then agree whether a small workflow test is worth running."
     )
 
 
@@ -552,7 +553,7 @@ def _briefing_markdown(account: AccountRecord, meeting_persona: str | None, focu
             "",
             "## 6. Likely Objections",
             *[
-                f"- Objection: {objection} Suggested response: {response}"
+                f"- Objection: {objection}\n  Response: {response}"
                 for objection, response in _likely_objections()
             ],
             "",

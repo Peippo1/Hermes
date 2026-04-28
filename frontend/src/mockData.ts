@@ -115,6 +115,30 @@ function formatNumber(value?: number | null): string {
   return new Intl.NumberFormat('en-GB').format(value);
 }
 
+function formatCompactNumber(value?: number | null): string {
+  if (value === null || value === undefined) return 'not provided';
+  const amount = Math.abs(value);
+  if (amount >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}m`;
+  }
+  if (amount >= 1_000) {
+    return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return `${value}`;
+}
+
+function formatCompactCurrency(value?: number | null): string {
+  if (value === null || value === undefined) return 'not provided';
+  const amount = Math.abs(value);
+  if (amount >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}m`;
+  }
+  if (amount >= 1_000) {
+    return `$${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return `$${value}`;
+}
+
 function toneOpening(tone: Tone): string {
   return {
     concise: 'Saw a few signals that made this worth a note.',
@@ -220,12 +244,29 @@ function composeMessage(account: AccountRecord, tone: Tone): string {
   const greeting = account.contact_name ? account.contact_name.split(/\s+/)[0] : 'there';
   const opening = openingSentence(account, tone);
   const focus = account.objective || 'the current commercial opportunity';
-  const siteLine = account.number_of_sites ? `For ${account.number_of_sites === 1 ? 'a single-site footprint' : `a ${account.number_of_sites}-site footprint`}, ` : 'For teams like yours, ';
+  const footprint = account.number_of_sites
+    ? `${formatCompactNumber(account.number_of_sites)}-site footprint`
+    : 'commercial footprint';
+  const visits = account.estimated_annual_visits ? `roughly ${formatCompactNumber(account.estimated_annual_visits)} annual visits` : null;
+  const volume = account.estimated_transaction_volume ? `an estimated ${formatCompactCurrency(account.estimated_transaction_volume)} transaction volume` : null;
+  const ticket = account.estimated_average_ticket_price ? `about ${formatCompactCurrency(account.estimated_average_ticket_price)} average ticket` : null;
+  const details = [visits, volume, ticket].filter(Boolean).join(', ');
+  const firstLine = account.contact_name
+    ? `Hi ${greeting}, ${account.company_name}'s ${footprint} and group-friendly format make ${focus} important.`
+    : `${account.company_name}'s ${footprint} and group-friendly format make ${focus} important.`;
+  const secondLine = details
+    ? `With ${details}, even small improvements in conversion or upsell could be meaningful.`
+    : `${opening} There is a clear case to keep the next step focused on one journey.`;
+  const roleClause = account.contact_role
+    ? ` For a ${account.contact_role}, the booking and group-sales journey looks like the right place to start.`
+    : '';
+  const closing = account.contact_role && /partnership/i.test(account.contact_role)
+    ? 'Worth a quick look at where the booking and group-sales journey could be tightened?'
+    : 'Worth a quick look at which journey could be tightened first?';
   const message = [
-    `Hi ${greeting}, ${opening}`,
-    `${siteLine}${focus} should stay the commercial focus.`,
-    'A cleaner workflow can help the team keep outreach and follow-up aligned without extra admin.',
-    `Worth a quick look at how to help ${focus}?`
+    firstLine,
+    `${secondLine}${roleClause}`,
+    closing
   ].join(' ');
   const words = message.split(/\s+/);
   return words.length > 100 ? words.slice(0, 100).join(' ') : message;
@@ -248,18 +289,13 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
   const overviewLines = [
     `${account.company_name} sits in the ${account.category || 'commercial'} space, with a sub-category of ${account.sub_category || 'unspecified sub-category'}.`,
     `The account is based in ${account.hq_location || account.region || 'an unspecified location'} and is represented here with ${account.number_of_sites ?? 'not provided'} site(s).`,
-    `Estimated annual visits: ${formatNumber(account.estimated_annual_visits)}. Average ticket price: ${formatMoney(account.estimated_average_ticket_price)}. Estimated annual revenue: ${formatMoney(account.estimated_annual_revenue)}.`
+    `Estimated annual visits: ${formatNumber(account.estimated_annual_visits)}. Average ticket price: ${formatMoney(account.estimated_average_ticket_price)}. Estimated Easol annual revenue: ${formatMoney(account.estimated_annual_revenue)}.`
   ];
   if (account.description) {
     overviewLines.push(`Description from the source data: ${account.description.replace(/\.$/, '')}.`);
   }
   const persona = meetingPersona || account.contact_name || account.contact_role || personaForAccount(account);
-  const focusLabel = {
-    commercial: 'Commercial',
-    operations: 'Operations',
-    growth: 'Growth',
-    customer_support: 'Customer support'
-  }[focus];
+  const roleLabel = account.contact_role || personaForAccount(account);
   const opportunitySummary = `For ${persona}, the clearest angle is to link ${account.signal || 'the current account profile'} to ${account.objective || 'a practical commercial next step'}. Focus the conversation on ${
     focus === 'operations'
       ? 'cost and complexity reduction, reporting consistency'
@@ -268,16 +304,16 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
         : focus === 'customer_support'
           ? 'AI customer support, cost and complexity reduction'
           : 'conversion improvement, average transaction value / upsell'
-  }. The most useful next step is a quick review of one real workflow or enquiry path, so the team can judge value without broad platform claims.`;
+  }.`;
   const quantified = [
     account.estimated_annual_visits && account.estimated_annual_revenue
-      ? `5% visit/revenue upside scenario: roughly ${formatNumber(Math.round(account.estimated_annual_visits * 0.05))} additional annual visits or about ${formatMoney(Math.round(account.estimated_annual_revenue * 0.05))} in annual revenue. These are directional estimates based only on the account data.`
-      : '5% visit/revenue upside scenario: not enough data to calculate a directional estimate from the account record.',
+      ? `25% conversion uplift value proposition: a meaningful improvement on one high-intent journey would be the upside case. Conservatively, a 5% visit uplift would be roughly ${formatNumber(Math.round(account.estimated_annual_visits * 0.05))} additional annual visits, and a 5% revenue uplift would be about ${formatMoney(Math.round(account.estimated_annual_revenue * 0.05))} in annual revenue. These are directional estimates based only on the account data.`
+      : '25% conversion uplift value proposition: not enough data to calculate a directional estimate from the account record.',
     account.estimated_transaction_volume && account.estimated_average_ticket_price
-      ? `8% transaction value uplift scenario: about ${formatMoney(account.estimated_average_ticket_price * 0.08)} more per transaction, which would be roughly ${formatMoney(account.estimated_transaction_volume * account.estimated_average_ticket_price * 0.08)} annually if applied across the estimated transaction volume. This is a directional estimate based only on the account data.`
+      ? `Transaction volume context: a 5% uplift on ${formatMoney(account.estimated_transaction_volume)} would be about ${formatMoney(Math.round(account.estimated_transaction_volume * 0.05))} annually. This remains a directional estimate based only on the account data.`
       : account.estimated_average_ticket_price
-        ? `8% transaction value uplift scenario: about ${formatMoney(account.estimated_average_ticket_price * 0.08)} more per transaction. The annual effect cannot be calculated cleanly because transaction volume is missing.`
-        : '8% transaction value uplift scenario: not enough pricing data to calculate a directional estimate.'
+        ? `Average ticket context: ${formatMoney(account.estimated_average_ticket_price)} per sale gives enough headroom to test upsell or conversion improvements without changing the core offer.`
+        : 'Average ticket context: not enough pricing data to calculate a directional estimate.'
   ].join(' ');
   const talkingPoints = [
     `What is the current priority behind ${account.objective || 'the next commercial step'}?`,
@@ -290,12 +326,12 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
     'What would a small test need to prove before anyone would scale it?'
   ];
   const objections = [
-    ['We already have a process for this.', 'That is a sensible starting point. The useful question is whether the current process leaves room for a lighter, faster first step.'],
-    ['Timing is not ideal.', 'Fair point. A short review can still show whether there is a low-effort way to test the idea later.'],
-    ['We need to avoid adding complexity.', 'Agreed. The conversation should stay focused on one practical use case and the smallest useful next step.']
+    ['We already have a process for this.', 'Acknowledge the current process, then ask where the workflow still creates manual effort or lost conversion.'],
+    ['Timing is not ideal.', 'Suggest a short, low-effort review instead of a full implementation discussion.'],
+    ['We need to avoid adding complexity.', 'Position the conversation as one narrow test around a single journey, not a platform replacement.']
   ] as const;
-  const systemsContext = 'Most teams in this space operate across separate ticketing, booking, CRM, support, spreadsheet, and reporting tools. The briefing should assume the opportunity is about making those systems work together more cleanly, not about replacing everything at once.';
-  const nextStep = `Propose a short follow-up focused on ${(account.objective || 'the current commercial priority').toLowerCase()} and ask for one specific workflow or customer journey to review first. Keep the next step narrow enough to assess ${focusLabel.toLowerCase()} value without adding process overhead.`;
+  const systemsContext = 'Most teams in this space operate across separate ticketing, booking, CRM, support, spreadsheet, and reporting tools. The briefing should treat the opportunity as a way to connect those systems more cleanly, not replace everything at once.';
+  const nextStep = 'Use the first call to choose one journey to inspect - for example group bookings, private hire, checkout conversion, or post-visit upsell - then agree whether a small workflow test is worth running.';
 
   return [
     `# Meeting Brief: ${account.company_name}`,
@@ -305,11 +341,11 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
     '',
     '## 2. Individual / Persona Profile',
     account.contact_name && account.contact_role
-      ? `Primary contact: ${account.contact_name} (${account.contact_role}).`
+      ? `For a ${roleLabel}, the primary contact is ${account.contact_name}.`
       : account.contact_name
         ? `Primary contact: ${account.contact_name}.`
         : account.contact_role
-          ? `Likely persona: ${account.contact_role}.`
+          ? `For a ${roleLabel}.`
           : `Likely persona: ${persona}.`,
     '',
     '## 3. Opportunity Analysis',
@@ -322,7 +358,7 @@ function briefingMarkdown(account: AccountRecord, focus: BriefingRequest['focus'
     ...talkingPoints.map((line) => `- ${line}`),
     '',
     '## 6. Likely Objections',
-    ...objections.map(([objection, response]) => `- Objection: ${objection} Suggested response: ${response}`),
+    ...objections.flatMap(([objection, response]) => [`Objection: ${objection}`, `Response: ${response}`, '']),
     '',
     '## 7. Competitive / Systems Context',
     systemsContext,

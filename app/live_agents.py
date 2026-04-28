@@ -177,7 +177,8 @@ def generate_live_briefing(
         "You produce concise sales briefing notes for the experience commerce and location-based entertainment market. "
         "Return only structured JSON matching the requested schema. "
         "The markdown must include the required sections, stay under 1000 words, use the account fields naturally, "
-        "label estimates as directional, and avoid named competitors or unsupported public claims."
+        "label estimates as directional, format objections as short objection/response pairs, keep the next step human and specific, "
+        "and avoid named competitors or unsupported public claims."
     )
     user_payload = {
         "account": account.model_dump(mode="json"),
@@ -186,6 +187,7 @@ def generate_live_briefing(
             "Write sales briefing material, not template prose.",
             "Use the account's objective, signal, and commercial scale data.",
             "Keep opportunity analysis specific and practical.",
+            "Use a compact objection and response structure rather than inline prose.",
             "Use only platform categories in the systems context section.",
         ],
     }
