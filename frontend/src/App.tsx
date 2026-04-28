@@ -27,6 +27,8 @@ import type {
   ExportArtifacts,
   OutreachDraft,
   QueueItem,
+  BriefingFocus,
+  Channel,
   Tone
 } from './types';
 
@@ -39,6 +41,55 @@ type ActionLoadingState = {
   export: boolean;
   queueView: boolean;
 };
+
+const SESSION_STORAGE_KEY = 'hermes.frontend.controls.v1';
+
+function loadSessionControls(): {
+  selectedAccountId: string;
+  selectedChannel: Channel;
+  selectedTone: Tone;
+  selectedFocus: BriefingFocus;
+} {
+  if (typeof window === 'undefined') {
+    return {
+      selectedAccountId: '',
+      selectedChannel: 'email',
+      selectedTone: 'concise',
+      selectedFocus: 'commercial'
+    };
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) {
+      return {
+        selectedAccountId: '',
+        selectedChannel: 'email',
+        selectedTone: 'concise',
+        selectedFocus: 'commercial'
+      };
+    }
+    const parsed = JSON.parse(raw) as Partial<{
+      selectedAccountId: string;
+      selectedChannel: Channel;
+      selectedTone: Tone;
+      selectedFocus: BriefingFocus;
+    }>;
+    return {
+      selectedAccountId: parsed.selectedAccountId ?? '',
+      selectedChannel: parsed.selectedChannel ?? 'email',
+      selectedTone: parsed.selectedTone ?? 'concise',
+      selectedFocus: parsed.selectedFocus ?? 'commercial'
+    };
+  } catch {
+    return {
+      selectedAccountId: '',
+      selectedChannel: 'email',
+      selectedTone: 'concise',
+      selectedFocus: 'commercial'
+    };
+  }
+}
 
 function formatNumber(value?: number | null): string {
   if (value === null || value === undefined) return 'Not provided';
@@ -155,12 +206,16 @@ function actionLabel(label: string, loading: boolean): string {
 }
 
 export default function App() {
+  const initialControls = loadSessionControls();
   const [mode, setMode] = useState<Mode>('mock');
   const [connectionState, setConnectionState] = useState<ConnectionState>('loading');
   const [statusMessage, setStatusMessage] = useState<string>('Loading account data.');
   const [actionError, setActionError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(initialControls.selectedAccountId);
+  const [selectedChannel, setSelectedChannel] = useState<Channel>(initialControls.selectedChannel);
+  const [selectedTone, setSelectedTone] = useState<Tone>(initialControls.selectedTone);
+  const [selectedFocus, setSelectedFocus] = useState<BriefingFocus>(initialControls.selectedFocus);
   const [outreach, setOutreach] = useState<OutreachDraft | null>(null);
   const [briefing, setBriefing] = useState<BriefingNote | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -178,6 +233,22 @@ export default function App() {
   const statusLabel = mode === 'api' ? 'Live mode' : 'Mock mode';
 
   const apiBaseUrl = hasApiBaseUrl() ? getApiBaseUrl() : 'Not configured';
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          selectedAccountId,
+          selectedChannel,
+          selectedTone,
+          selectedFocus
+        })
+      );
+    } catch {
+      // Session storage is best-effort only.
+    }
+  }, [selectedAccountId, selectedChannel, selectedTone, selectedFocus]);
 
   function setLoadingFlag(key: keyof ActionLoadingState, value: boolean) {
     setLoading((current) => ({ ...current, [key]: value }));
@@ -251,16 +322,25 @@ export default function App() {
     setActionError(null);
     setLoadingFlag('outreach', true);
     try {
+      const request = {
+        account_id: selectedAccount.account_id,
+        channel: selectedChannel,
+        tone: selectedTone
+      };
       if (mode === 'mock') {
-        setOutreach(generateMockOutreach(selectedAccount));
+        setOutreach(generateMockOutreach(selectedAccount, request));
         return;
       }
-      setOutreach(await generateOutreach({ account_id: selectedAccount.account_id }));
+      setOutreach(await generateOutreach(request));
     } catch (error) {
       const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
       setActionError(fallbackMessage(kind));
       switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
-      setOutreach(generateMockOutreach(selectedAccount));
+      setOutreach(generateMockOutreach(selectedAccount, {
+        account_id: selectedAccount.account_id,
+        channel: selectedChannel,
+        tone: selectedTone
+      }));
     } finally {
       setLoadingFlag('outreach', false);
     }
@@ -271,16 +351,23 @@ export default function App() {
     setActionError(null);
     setLoadingFlag('briefing', true);
     try {
+      const request = {
+        account_id: selectedAccount.account_id,
+        focus: selectedFocus
+      };
       if (mode === 'mock') {
-        setBriefing(generateMockBriefing(selectedAccount));
+        setBriefing(generateMockBriefing(selectedAccount, request));
         return;
       }
-      setBriefing(await generateBriefing({ account_id: selectedAccount.account_id }));
+      setBriefing(await generateBriefing(request));
     } catch (error) {
       const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
       setActionError(fallbackMessage(kind));
       switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
-      setBriefing(generateMockBriefing(selectedAccount));
+      setBriefing(generateMockBriefing(selectedAccount, {
+        account_id: selectedAccount.account_id,
+        focus: selectedFocus
+      }));
     } finally {
       setLoadingFlag('briefing', false);
     }
@@ -292,26 +379,54 @@ export default function App() {
     setLoadingFlag('queue', true);
     try {
       if (mode === 'mock') {
-        const item = enqueueMockOutreach(selectedAccount);
+        const item = enqueueMockOutreach(selectedAccount, {
+          account_id: selectedAccount.account_id,
+          channel: selectedChannel,
+          tone: selectedTone
+        });
         setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
         setQueueSize((current) => current + 1);
-        if (!outreach) setOutreach(generateMockOutreach(selectedAccount));
+        if (!outreach) {
+          setOutreach(generateMockOutreach(selectedAccount, {
+            account_id: selectedAccount.account_id,
+            channel: selectedChannel,
+            tone: selectedTone
+          }));
+        }
         return;
       }
-      const response = await queueOutreach({ account_id: selectedAccount.account_id });
+      const response = await queueOutreach({
+        account_id: selectedAccount.account_id,
+        channel: selectedChannel,
+        tone: selectedTone
+      });
       setQueue((current) => [response.item, ...current.filter((entry) => entry.queue_id !== response.item.queue_id)]);
       setQueueSize(response.queue_size);
       if (!outreach) {
-        setOutreach(await generateOutreach({ account_id: selectedAccount.account_id }));
+        setOutreach(await generateOutreach({
+          account_id: selectedAccount.account_id,
+          channel: selectedChannel,
+          tone: selectedTone
+        }));
       }
     } catch (error) {
       const kind = error instanceof ApiError && error.kind === 'request-failed' ? 'request-failed' : 'backend-unavailable';
       setActionError(fallbackMessage(kind));
       switchToMock(kind, accounts.length > 0 ? accounts : getMockAccounts());
-      const item = enqueueMockOutreach(selectedAccount);
+      const item = enqueueMockOutreach(selectedAccount, {
+        account_id: selectedAccount.account_id,
+        channel: selectedChannel,
+        tone: selectedTone
+      });
       setQueue((current) => [item, ...current.filter((entry) => entry.account_id !== item.account_id)]);
       setQueueSize((current) => current + 1);
-      if (!outreach) setOutreach(generateMockOutreach(selectedAccount));
+      if (!outreach) {
+        setOutreach(generateMockOutreach(selectedAccount, {
+          account_id: selectedAccount.account_id,
+          channel: selectedChannel,
+          tone: selectedTone
+        }));
+      }
     } finally {
       setLoadingFlag('queue', false);
     }
@@ -416,6 +531,39 @@ export default function App() {
                   </option>
                 ))}
               </select>
+              <p className="field-help">Adjust tone and focus before generating outputs.</p>
+            </div>
+            <div className="control-stack">
+              <div className="control-row">
+                <div className="field">
+                  <label htmlFor="channel">Channel</label>
+                  <select id="channel" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value as Channel)}>
+                    <option value="email">Email</option>
+                    <option value="linkedin">LinkedIn</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="tone">Tone</label>
+                  <select id="tone" value={selectedTone} onChange={(event) => setSelectedTone(event.target.value as Tone)}>
+                    <option value="concise">Concise</option>
+                    <option value="warm">Warm</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="focus">Focus / persona</label>
+                  <select
+                    id="focus"
+                    value={selectedFocus}
+                    onChange={(event) => setSelectedFocus(event.target.value as BriefingFocus)}
+                  >
+                    <option value="commercial">Commercial</option>
+                    <option value="operations">Operations</option>
+                    <option value="growth">Growth</option>
+                    <option value="customer_support">Customer support</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <div className="status-panel panel">
               <div>

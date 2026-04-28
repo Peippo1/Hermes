@@ -213,7 +213,7 @@ code {
 
 .control-grid {
   display: grid;
-  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(240px, 360px);
   gap: 16px;
   align-items: start;
 }
@@ -221,6 +221,18 @@ code {
 .field {
   display: grid;
   gap: 8px;
+}
+
+.control-stack {
+  display: grid;
+  gap: 10px;
+  align-self: start;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .field label {
@@ -236,6 +248,13 @@ code {
   background: rgba(255, 255, 255, 0.96);
   padding: 12px 14px;
   color: var(--text);
+}
+
+.field-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 .actions,
@@ -551,6 +570,10 @@ th {
   }
 
   .control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-row {
     grid-template-columns: 1fr;
   }
 
