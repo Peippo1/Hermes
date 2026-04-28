@@ -264,6 +264,32 @@ code {
   line-height: 1.5;
 }
 
+.control-helper {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.workflow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.workflow-step {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.38rem 0.7rem;
+  background: rgba(30, 41, 59, 0.05);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .actions,
 .button-row {
   display: flex;
@@ -280,6 +306,47 @@ code {
 .actions button:hover,
 .button-row button:hover {
   background: #1e293b;
+}
+
+.primary-button {
+  background: #243447;
+}
+
+.primary-button:hover {
+  background: #1e293b;
+}
+
+.secondary-button {
+  background: rgba(30, 41, 59, 0.06);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.secondary-button:hover {
+  background: rgba(30, 41, 59, 0.1);
+}
+
+.outline-button {
+  background: transparent;
+  color: var(--text);
+  border-color: rgba(30, 41, 59, 0.16);
+  box-shadow: none;
+}
+
+.outline-button:hover {
+  background: rgba(30, 41, 59, 0.04);
+}
+
+.ghost-button {
+  background: transparent;
+  color: var(--muted);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ghost-button:hover {
+  background: rgba(30, 41, 59, 0.04);
+  color: var(--text);
 }
 
 .status-panel {
@@ -795,6 +862,24 @@ th {
   .actions,
   .button-row {
     flex-direction: column;
+  }
+
+  .workflow-steps {
+    gap: 6px;
+  }
+
+  .workflow-step {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .actions button,
+  .button-row button,
+  .primary-button,
+  .secondary-button,
+  .outline-button,
+  .ghost-button {
+    width: 100%;
   }
 
   .status-note {

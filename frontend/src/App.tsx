@@ -629,6 +629,15 @@ export default function App() {
                 </div>
               </div>
             </div>
+            <div className="workflow-steps" aria-label="Workflow steps">
+              <span className="workflow-step">1. Select account</span>
+              <span className="workflow-step">2. Generate outputs</span>
+              <span className="workflow-step">3. Review outputs</span>
+              <span className="workflow-step">4. Queue &amp; export</span>
+            </div>
+            <p className="control-helper">
+              Adjust the account, channel, tone and briefing focus before generating outputs.
+            </p>
             <div className="status-panel panel">
               <div>
                 <span className="label">Mode</span>
@@ -668,19 +677,19 @@ export default function App() {
           {actionError ? <div className="error-banner">{actionError}</div> : null}
 
           <div className="button-row actions">
-            <button type="button" onClick={handleGenerateOutreach} disabled={loading.outreach}>
+            <button type="button" className="primary-button" onClick={handleGenerateOutreach} disabled={loading.outreach}>
               {actionLabel('Generate Outreach', loading.outreach)}
             </button>
-            <button type="button" onClick={handleGenerateBriefing} disabled={loading.briefing}>
+            <button type="button" className="secondary-button" onClick={handleGenerateBriefing} disabled={loading.briefing}>
               {actionLabel('Generate Briefing', loading.briefing)}
             </button>
-            <button type="button" onClick={handleQueueOutreach} disabled={loading.queue}>
+            <button type="button" className="outline-button" onClick={handleQueueOutreach} disabled={loading.queue}>
               {actionLabel('Add to Mock Queue', loading.queue)}
             </button>
-            <button type="button" onClick={handleViewQueue} disabled={loading.queueView}>
+            <button type="button" className="ghost-button" onClick={handleViewQueue} disabled={loading.queueView}>
               {actionLabel('View Queue', loading.queueView)}
             </button>
-            <button type="button" onClick={handleExportExamples} disabled={loading.export}>
+            <button type="button" className="ghost-button" onClick={handleExportExamples} disabled={loading.export}>
               {actionLabel('Export Examples', loading.export)}
             </button>
           </div>
