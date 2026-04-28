@@ -292,6 +292,12 @@ code {
   line-height: 1.55;
 }
 
+.status-panel .subtle-value {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .status-note {
   grid-column: span 2;
   border-radius: 10px;
@@ -373,14 +379,55 @@ code {
   gap: 15px 18px;
 }
 
+.account-profile {
+  display: grid;
+  gap: 16px;
+}
+
+.profile-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(75, 107, 136, 0.08), rgba(75, 107, 136, 0.03)),
+    rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(75, 107, 136, 0.09);
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.48rem 0.78rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(30, 41, 59, 0.08);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .preview-grid .wide {
   grid-column: span 2;
 }
 
 .preview-grid p {
   margin: 6px 0 0;
-  line-height: 1.65;
+  line-height: 1.62;
   color: var(--text);
+}
+
+.preview-grid > div {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(75, 107, 136, 0.03);
+  border: 1px solid rgba(30, 41, 59, 0.05);
+}
+
+.preview-grid > .wide {
+  background: rgba(75, 107, 136, 0.025);
 }
 
 .empty-state {

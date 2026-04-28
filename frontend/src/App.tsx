@@ -105,6 +105,15 @@ function formatMoney(value?: number | null): string {
   }).format(value);
 }
 
+function formatDollar(value?: number | null): string {
+  if (value === null || value === undefined) return 'Not provided';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
 function joinList(values: string[] | undefined): string {
   return values && values.length > 0 ? values.join(' • ') : 'None';
 }
@@ -568,7 +577,7 @@ export default function App() {
             <div className="status-panel panel">
               <div>
                 <span className="label">API base URL</span>
-                <p>{apiBaseUrl}</p>
+                <p className="subtle-value">{apiBaseUrl}</p>
               </div>
               <div>
                 <span className="label">Mode</span>
@@ -633,7 +642,14 @@ export default function App() {
             </div>
 
             {selectedAccount ? (
-              <div className="preview-grid">
+              <div className="account-profile">
+                <div className="profile-strip">
+                  <span className="profile-badge">{selectedAccount.number_of_sites ?? '—'} sites</span>
+                  <span className="profile-badge">{formatNumber(selectedAccount.estimated_annual_visits)} visits</span>
+                  <span className="profile-badge">{formatDollar(selectedAccount.estimated_average_ticket_price)} ticket</span>
+                  <span className="profile-badge">{formatDollar(selectedAccount.estimated_transaction_volume)} volume</span>
+                </div>
+                <div className="preview-grid">
                 <div>
                   <span className="label">Category</span>
                   <p>{selectedAccount.category ?? 'Not provided'}</p>
@@ -655,13 +671,19 @@ export default function App() {
                   <p>{formatNumber(selectedAccount.estimated_annual_visits)}</p>
                 </div>
                 <div>
-                  <span className="label">Average ticket</span>
-                  <p>{formatMoney(selectedAccount.estimated_average_ticket_price)}</p>
+                  <span className="label">Est. average ticket</span>
+                  <p>{formatDollar(selectedAccount.estimated_average_ticket_price)}</p>
                 </div>
                 <div>
-                  <span className="label">Annual revenue</span>
-                  <p>{formatMoney(selectedAccount.estimated_annual_revenue)}</p>
+                  <span className="label">Est. transaction volume</span>
+                  <p>{formatDollar(selectedAccount.estimated_transaction_volume)}</p>
                 </div>
+                {selectedAccount.estimated_annual_revenue !== null && selectedAccount.estimated_annual_revenue !== undefined ? (
+                  <div>
+                    <span className="label">Est. Easol annual revenue</span>
+                    <p>{formatDollar(selectedAccount.estimated_annual_revenue)}</p>
+                  </div>
+                ) : null}
                 <div>
                   <span className="label">Contact</span>
                   <p>{selectedAccount.contact_name ?? 'Not provided'}</p>
@@ -682,6 +704,7 @@ export default function App() {
                   <span className="label">Objective</span>
                   <p>{selectedAccount.objective ?? 'Not provided'}</p>
                 </div>
+              </div>
               </div>
             ) : (
               <p className="empty-state">Load an account list to start.</p>
@@ -713,13 +736,15 @@ export default function App() {
                 <div className="message-card">
                   <div className="message-body">{outreach.message}</div>
                 </div>
-                <div className="flag-list">
-                  {outreach.guardrail_flags.map((flag) => (
-                    <span key={flag} className="flag">
-                      {flag}
-                    </span>
-                  ))}
-                </div>
+                {outreach.guardrail_flags.length > 0 ? (
+                  <div className="flag-list">
+                    {outreach.guardrail_flags.map((flag) => (
+                      <span key={flag} className="flag">
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="empty-state">Generate outreach for the selected account.</p>
@@ -741,13 +766,15 @@ export default function App() {
                 <div className="briefing-card markdown-card">
                   {renderBriefingMarkdown(briefing.briefing_markdown)}
                 </div>
-                <div className="flag-list">
-                  {briefing.guardrail_flags.map((flag) => (
-                    <span key={flag} className="flag">
-                      {flag}
-                    </span>
-                  ))}
-                </div>
+                {briefing.guardrail_flags.length > 0 ? (
+                  <div className="flag-list">
+                    {briefing.guardrail_flags.map((flag) => (
+                      <span key={flag} className="flag">
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="empty-state">Generate a briefing for the selected account.</p>
