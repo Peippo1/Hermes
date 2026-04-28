@@ -47,25 +47,54 @@ class AccountLoadResult:
 
 
 ALIASES: dict[str, list[str]] = {
-    "account_id": ["account_id", "id", "company_id", "record_id"],
-    "company_name": ["company_name", "company", "account_name", "name"],
+    "account_id": ["account_id", "id", "company_id", "record_id", "account name", "account"],
+    "company_name": ["company_name", "company", "account_name", "account name", "name"],
     "category": ["category", "segment", "industry"],
-    "sub_category": ["sub_category", "subsegment", "venue_type", "vertical"],
+    "sub_category": ["sub_category", "sub-category", "subsegment", "venue_type", "vertical"],
     "description": ["description", "notes", "summary", "signal"],
-    "hq_location": ["hq_location", "headquarters", "city", "location"],
-    "number_of_sites": ["number_of_sites", "sites", "site_count"],
-    "estimated_annual_visits": ["estimated_annual_visits", "annual_visits", "visits"],
-    "estimated_average_ticket_price": ["estimated_average_ticket_price", "average_ticket_price", "ticket_price"],
-    "estimated_transaction_volume": ["estimated_transaction_volume", "transaction_volume", "transactions"],
-    "estimated_annual_revenue": ["estimated_annual_revenue", "annual_revenue", "revenue"],
+    "hq_location": ["hq_location", "hq location", "headquarters", "city", "location"],
+    "number_of_sites": ["number_of_sites", "sites", "site count"],
+    "estimated_annual_visits": ["estimated_annual_visits", "est. annual visits", "annual_visits", "annual visits", "visits"],
+    "estimated_average_ticket_price": [
+        "estimated_average_ticket_price",
+        "est. avg ticket price ($)",
+        "estimated avg ticket price ($)",
+        "average_ticket_price",
+        "average ticket price",
+        "ticket_price",
+        "ticket price",
+    ],
+    "estimated_transaction_volume": [
+        "estimated_transaction_volume",
+        "est. total transaction volume ($)",
+        "estimated total transaction volume ($)",
+        "transaction_volume",
+        "transaction volume",
+        "transactions",
+    ],
+    "estimated_annual_revenue": [
+        "estimated_annual_revenue",
+        "est. easol annual revenue ($)",
+        "estimated easol annual revenue ($)",
+        "annual_revenue",
+        "annual revenue",
+        "revenue",
+    ],
     "region": ["region", "market", "territory"],
-    "contact_name": ["contact_name", "contact"],
-    "contact_role": ["contact_role", "role", "title"],
+    "contact_name": ["contact_name", "contact name", "contact"],
+    "contact_role": ["contact_role", "contact title", "contact title/role", "contact role", "role", "title"],
     "website": ["website", "url", "site"],
     "signal": ["signal", "source_signal"],
     "objective": ["objective", "goal"],
     "notes": ["notes", "commentary"],
     "source": ["source"],
+}
+
+CONTACT_CATEGORY_PRIORITY = {
+    "commercial": 0,
+    "ceo_managing_director": 1,
+    "operations": 2,
+    "finance": 3,
 }
 
 def _sample_rows() -> list[dict[str, Any]]:
@@ -157,7 +186,13 @@ def _coerce_int(value: Any) -> int | None:
     if value in ("", None):
         return None
     try:
-        return int(float(value))
+        text = str(value).strip()
+        if not text:
+            return None
+        text = re.sub(r"[^0-9.\-]", "", text)
+        if not text or text in {".", "-", "-."}:
+            return None
+        return int(float(text))
     except (TypeError, ValueError):
         return None
 
@@ -166,7 +201,13 @@ def _coerce_float(value: Any) -> float | None:
     if value in ("", None):
         return None
     try:
-        return float(value)
+        text = str(value).strip()
+        if not text:
+            return None
+        text = re.sub(r"[^0-9.\-]", "", text)
+        if not text or text in {".", "-", "-."}:
+            return None
+        return float(text)
     except (TypeError, ValueError):
         return None
 
@@ -186,14 +227,77 @@ def _row_from_record(raw_row: dict[str, Any]) -> dict[str, Any]:
         normalized_aliases = [_normalize_column_name(alias) for alias in [target, *aliases]]
         record[target] = _pick_value(normalized_row, normalized_aliases)
 
-    record["account_id"] = record["account_id"] or normalized_row.get("account_id") or normalized_row.get("id")
-    record["company_name"] = record["company_name"] or normalized_row.get("company_name") or record["account_id"]
+    record["company_name"] = record["company_name"] or normalized_row.get("company_name")
+    record["account_id"] = record["account_id"] or normalized_row.get("account_id") or normalized_row.get("id") or record["company_name"]
+    record["company_name"] = record["company_name"] or record["account_id"]
+    record["_contact_category"] = _pick_value(normalized_row, [_normalize_column_name("contact_category")])
     record["number_of_sites"] = _coerce_int(record["number_of_sites"])
     record["estimated_annual_visits"] = _coerce_int(record["estimated_annual_visits"])
     record["estimated_average_ticket_price"] = _coerce_float(record["estimated_average_ticket_price"])
     record["estimated_transaction_volume"] = _coerce_int(record["estimated_transaction_volume"])
     record["estimated_annual_revenue"] = _coerce_float(record["estimated_annual_revenue"])
-    return {**normalized_row, **record}
+    return record
+
+
+def _contact_category_rank(value: Any) -> int:
+    normalized = _normalize_column_name(value)
+    if normalized in CONTACT_CATEGORY_PRIORITY:
+        return CONTACT_CATEGORY_PRIORITY[normalized]
+    if normalized.startswith("ceo") and "managing_director" in normalized:
+        return CONTACT_CATEGORY_PRIORITY[_normalize_column_name("CEO / Managing Director")]
+    return len(CONTACT_CATEGORY_PRIORITY)
+
+
+def _row_completeness(row: dict[str, Any]) -> int:
+    return sum(1 for key in ALIASES if row.get(key) not in ("", None))
+
+
+def _first_non_empty_row_value(rows: list[dict[str, Any]], field: str) -> Any:
+    for row in rows:
+        value = row.get(field)
+        if value not in ("", None):
+            return value
+    return None
+
+
+def _group_account_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped_rows: list[tuple[str, list[dict[str, Any]]]] = []
+    index_by_key: dict[str, int] = {}
+
+    for source_index, row in enumerate(rows, start=1):
+        group_key = _normalize_column_name(row.get("account_id") or row.get("company_name") or f"ROW-{source_index}")
+        if not group_key:
+            group_key = f"row_{source_index}"
+        if group_key not in index_by_key:
+            index_by_key[group_key] = len(grouped_rows)
+            grouped_rows.append((group_key, []))
+        grouped_rows[index_by_key[group_key]][1].append({**row, "_source_index": source_index})
+
+    merged_rows: list[dict[str, Any]] = []
+    for _, grouped in grouped_rows:
+        ordered_rows = sorted(
+            grouped,
+            key=lambda row: (
+                _contact_category_rank(row.get("_contact_category")),
+                -_row_completeness(row),
+                row.get("_source_index", 0),
+            ),
+        )
+
+        merged: dict[str, Any] = {}
+        for field in ALIASES:
+            merged[field] = _first_non_empty_row_value(ordered_rows, field)
+
+        merged["account_id"] = merged["account_id"] or merged["company_name"]
+        merged["company_name"] = merged["company_name"] or merged["account_id"]
+        merged["number_of_sites"] = _coerce_int(merged["number_of_sites"])
+        merged["estimated_annual_visits"] = _coerce_int(merged["estimated_annual_visits"])
+        merged["estimated_average_ticket_price"] = _coerce_float(merged["estimated_average_ticket_price"])
+        merged["estimated_transaction_volume"] = _coerce_int(merged["estimated_transaction_volume"])
+        merged["estimated_annual_revenue"] = _coerce_float(merged["estimated_annual_revenue"])
+        merged_rows.append(merged)
+
+    return merged_rows
 
 
 def _load_csv_records(source: Path) -> list[dict[str, Any]]:
@@ -295,7 +399,8 @@ def load_accounts_from_csv_url(url: str) -> list[AccountRecord]:
         )
 
     records = _load_csv_records_from_text(text, normalized_url)
-    return [normalise_row(row, idx) for idx, row in enumerate(records, start=1)]
+    normalized_rows = [_row_from_record(row) for row in records]
+    return [normalise_row(row, idx) for idx, row in enumerate(_group_account_rows(normalized_rows), start=1)]
 
 
 def _looks_like_html(text: str) -> bool:
@@ -387,6 +492,7 @@ def normalise_row(row: dict[str, Any], fallback_index: int) -> AccountRecord:
     record = _row_from_record(row)
     record["account_id"] = record["account_id"] or f"ROW-{fallback_index:03d}"
     record["company_name"] = record["company_name"] or record["account_id"]
+    record.pop("_contact_category", None)
     try:
         return AccountRecord.model_validate(record)
     except ValidationError as exc:
@@ -407,7 +513,8 @@ def load_accounts_from_path(path: str | Path | None = None) -> list[AccountRecor
     else:
         raise AccountDataMalformedError(f"Unsupported account data format '{source.suffix}'. Use CSV or XLSX.")
 
-    return [normalise_row(row, idx) for idx, row in enumerate(records, start=1)]
+    normalized_rows = [_row_from_record(row) for row in records]
+    return [normalise_row(row, idx) for idx, row in enumerate(_group_account_rows(normalized_rows), start=1)]
 
 
 def load_accounts_with_metadata(
