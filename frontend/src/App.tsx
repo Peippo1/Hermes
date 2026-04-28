@@ -114,6 +114,30 @@ function formatDollar(value?: number | null): string {
   }).format(value);
 }
 
+function formatCompactNumber(value?: number | null): string {
+  if (value === null || value === undefined) return '—';
+  const amount = Math.abs(value);
+  if (amount >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}m`;
+  }
+  if (amount >= 1_000) {
+    return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return `${value}`;
+}
+
+function formatCompactDollar(value?: number | null): string {
+  if (value === null || value === undefined) return '—';
+  const amount = Math.abs(value);
+  if (amount >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}m`;
+  }
+  if (amount >= 1_000) {
+    return `$${(value / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
+  }
+  return `$${value}`;
+}
+
 function joinList(values: string[] | undefined): string {
   return values && values.length > 0 ? values.join(' • ') : 'None';
 }
@@ -121,10 +145,10 @@ function joinList(values: string[] | undefined): string {
 function accountOptionLabel(account: AccountRecord): string {
   const parts: string[] = [account.company_name];
   if (account.number_of_sites !== null && account.number_of_sites !== undefined) {
-    parts.push(`${account.number_of_sites} site${account.number_of_sites === 1 ? '' : 's'}`);
+    parts.push(`${formatCompactNumber(account.number_of_sites)} site${account.number_of_sites === 1 ? '' : 's'}`);
   }
   if (account.estimated_annual_visits !== null && account.estimated_annual_visits !== undefined) {
-    parts.push(`${formatNumber(account.estimated_annual_visits)} visits`);
+    parts.push(`${formatCompactNumber(account.estimated_annual_visits)} visits`);
   }
   if (account.contact_role) {
     parts.push(account.contact_role);
@@ -731,10 +755,10 @@ export default function App() {
             {selectedAccount ? (
               <div className="account-profile">
                 <div className="profile-strip">
-                  <span className="profile-badge">{selectedAccount.number_of_sites ?? '—'} sites</span>
-                  <span className="profile-badge">{formatNumber(selectedAccount.estimated_annual_visits)} visits</span>
-                  <span className="profile-badge">{formatDollar(selectedAccount.estimated_average_ticket_price)} ticket</span>
-                  <span className="profile-badge">{formatDollar(selectedAccount.estimated_transaction_volume)} volume</span>
+                  <span className="profile-badge">{formatCompactNumber(selectedAccount.number_of_sites)} sites</span>
+                  <span className="profile-badge">{formatCompactNumber(selectedAccount.estimated_annual_visits)} visits</span>
+                  <span className="profile-badge">{formatCompactDollar(selectedAccount.estimated_average_ticket_price)} avg ticket</span>
+                  <span className="profile-badge">{formatCompactDollar(selectedAccount.estimated_transaction_volume)} volume</span>
                 </div>
                 <div className="preview-grid">
                 <div>
@@ -758,7 +782,7 @@ export default function App() {
                   <p>{formatNumber(selectedAccount.estimated_annual_visits)}</p>
                 </div>
                 <div>
-                  <span className="label">Est. average ticket</span>
+                  <span className="label">Avg ticket</span>
                   <p>{formatDollar(selectedAccount.estimated_average_ticket_price)}</p>
                 </div>
                 <div>
@@ -767,15 +791,13 @@ export default function App() {
                 </div>
                 {selectedAccount.estimated_annual_revenue !== null && selectedAccount.estimated_annual_revenue !== undefined ? (
                   <div>
-                    <span className="label">Est. Easol annual revenue</span>
+                    <span className="label">Est. Easol revenue</span>
                     <p>{formatDollar(selectedAccount.estimated_annual_revenue)}</p>
                   </div>
                 ) : null}
-                <div>
+                <div className="contact-block">
                   <span className="label">Contact</span>
                   <p>{selectedAccount.contact_name ?? 'Not provided'}</p>
-                </div>
-                <div>
                   <span className="label">Role</span>
                   <p>{selectedAccount.contact_role ?? 'Not provided'}</p>
                 </div>

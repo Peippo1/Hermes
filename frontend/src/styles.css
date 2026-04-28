@@ -526,6 +526,16 @@ code {
   letter-spacing: 0.02em;
 }
 
+.contact-block {
+  display: grid;
+  gap: 6px;
+}
+
+.contact-block p {
+  margin: 0;
+  line-height: 1.55;
+}
+
 .preview-grid .wide {
   grid-column: span 2;
 }
