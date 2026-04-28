@@ -118,6 +118,20 @@ function joinList(values: string[] | undefined): string {
   return values && values.length > 0 ? values.join(' • ') : 'None';
 }
 
+function accountOptionLabel(account: AccountRecord): string {
+  const parts: string[] = [account.company_name];
+  if (account.number_of_sites !== null && account.number_of_sites !== undefined) {
+    parts.push(`${account.number_of_sites} site${account.number_of_sites === 1 ? '' : 's'}`);
+  }
+  if (account.estimated_annual_visits !== null && account.estimated_annual_visits !== undefined) {
+    parts.push(`${formatNumber(account.estimated_annual_visits)} visits`);
+  }
+  if (account.contact_role) {
+    parts.push(account.contact_role);
+  }
+  return parts.join(' · ');
+}
+
 function renderBriefingMarkdown(markdown: string): JSX.Element[] {
   const blocks: JSX.Element[] = [];
   const lines = markdown.split('\n');
@@ -577,7 +591,7 @@ export default function App() {
               >
                 {accounts.map((account) => (
                   <option key={account.account_id} value={account.account_id}>
-                    {account.company_name}
+                    {accountOptionLabel(account)}
                   </option>
                 ))}
               </select>
