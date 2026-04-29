@@ -2,6 +2,37 @@
 
 Use this file if Claude is used on the repository.
 
+## Claude Context
+
+Hermes is a production-shaped AI workflow prototype.
+
+Key principles:
+
+- deterministic-first
+- LLM optional
+- human review required
+- no external sending
+
+System flow:
+
+data → backend → agents → outputs → queue → export
+
+Important constraints:
+
+- do not generate unsupported claims
+- do not invent competitors
+- outputs must be concise and reviewable
+
+Development approach:
+
+- test-driven development
+- behaviour-focused tests
+- safe iteration via pytest
+
+Purpose:
+
+Demonstrate how AI can support commercial workflows safely and incrementally.
+
 ## Priorities
 
 - Keep the backend and frontend separated unless a task explicitly crosses the boundary.
@@ -28,4 +59,3 @@ Use this file if Claude is used on the repository.
 python3 -m unittest tests.test_outreach tests.test_briefing tests.test_queue_exports
 cd frontend && npm install && npm run build
 ```
-
