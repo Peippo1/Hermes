@@ -56,6 +56,21 @@ export HERMES_MODEL=gpt-4.1-mini
 
 If live mode is enabled but the OpenAI key is missing or the live call fails, Hermes falls back to deterministic output and adds a guardrail flag explaining the fallback.
 
+## Testing and TDD
+
+Hermes is set up to support a red-green-refactor loop on the backend:
+
+1. Write or update a failing test.
+2. Implement the smallest change that makes it pass.
+3. Run `pytest`.
+4. Refactor while the tests stay green.
+
+The backend tests are deterministic. They force bundled or local sample data, clear external environment variables in the test harness, and avoid external network calls unless a test explicitly patches a local fixture.
+
+The live OpenAI path is environment-gated and covered by fallback tests, so the deterministic path stays the default for development and review.
+
+Current backend test coverage includes generation, queueing, exports, data loading, and live-agent fallback behavior.
+
 ## Frontend
 
 The repo includes a lightweight Vite + React + TypeScript frontend in `frontend/`.

@@ -2,6 +2,8 @@
 
 Hermes is a production-shaped prototype for AI sales enablement in the experience commerce and location-based entertainment space. It ingests account data, turns that data into personalised outreach and briefing content, and presents the output through a lightweight frontend with a mock outbound queue and export/report flows. The system is designed to demonstrate a realistic workflow from account list to draft outreach, briefing notes, and reviewable queue items, while keeping sending and review safely controlled.
 
+The backend was built with a TDD-style loop in mind, and the automated tests make it safe to iterate on AI workflow logic without changing the public API surface.
+
 ## What Is Implemented
 
 - Google Sheet / CSV account ingestion, with local CSV/XLSX fallback support
@@ -13,6 +15,7 @@ Hermes is a production-shaped prototype for AI sales enablement in the experienc
 - Optional OpenAI live generation behind an environment flag
 - Vercel frontend for the demo experience
 - Render backend for hosted API deployment
+- Automated tests covering generation, queueing, exports, data loading, and live-agent fallback
 
 ## How The Workflows Map To The Brief
 
@@ -27,6 +30,7 @@ Hermes is a production-shaped prototype for AI sales enablement in the experienc
 - Deterministic fallback when live generation is unavailable
 - No unsupported claims
 - Directional estimates only
+- Test coverage supports safe iteration on the workflow logic
 
 ## Intentionally Out Of Scope
 
