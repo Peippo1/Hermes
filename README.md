@@ -9,6 +9,12 @@ It turns account lists into:
 - a local mock outbound queue
 - reviewable export artifacts
 
+## Architecture Flow
+
+![Hermes Architecture Overview](image.png)
+
+The diagram above shows the deterministic-first backend flow, the optional live-model path, the human review gate, and the mock queue/export surfaces that keep the prototype safe to run locally.
+
 ## What Problem It Solves
 
 Commercial teams often have account data scattered across exports, spreadsheets, CRM notes, and manual research. That makes it slow to prepare outreach, prep for meetings, and create consistent follow-up material.
