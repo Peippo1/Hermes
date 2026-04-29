@@ -42,6 +42,27 @@ The generator split is deliberately small:
 
 This keeps the service predictable while leaving a clean integration point for a future model-backed implementation.
 
+## Hermes Agent Model
+
+Hermes uses a small, explicit agent model for the workflow:
+
+- Data Agent
+  - normalises account data
+  - handles missing fields
+  - prepares structured context
+- Content Agent
+  - generates outreach and briefing content
+  - deterministic by default
+  - optional LLM path
+- Guardrails Agent
+  - prevents hallucination
+  - enforces tone and constraints
+  - ensures safe outputs
+- Queue Agent
+  - models the outbound workflow
+  - `pending_review` only
+  - no external sending
+
 ## Guardrails
 
 - Use only fields present in the account record
