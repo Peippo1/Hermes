@@ -64,12 +64,15 @@ If live mode is enabled but the OpenAI key is missing or the live call fails, He
 
 ## Testing and TDD
 
-Hermes is set up to support a red-green-refactor loop on the backend:
+Hermes follows a red-green-refactor loop for backend workflow changes. The canonical workflow is documented in [TDD.md](TDD.md).
 
-1. Write or update a failing test.
-2. Implement the smallest change that makes it pass.
-3. Run `pytest`.
-4. Refactor while the tests stay green.
+The key rules are:
+
+- Test behavior through public API endpoints.
+- Do not test internal implementation details.
+- Keep deterministic outputs stable under test.
+- Cover one behavior per test.
+- Keep tests resilient across refactors.
 
 The backend tests are deterministic. They force bundled or local sample data, clear external environment variables in the test harness, and avoid external network calls unless a test explicitly patches a local fixture.
 
